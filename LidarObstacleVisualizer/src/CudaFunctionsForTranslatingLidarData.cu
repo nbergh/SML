@@ -1,6 +1,6 @@
 #include <math.h>
 
-#include "Headers/CudaFunctions.h"
+#include "Headers/StructDefinitions.h"
 #include "Headers/CudaErrorCheckFunctions.h"
 
 __device__ int getShort(char* atLocation) {
@@ -48,7 +48,7 @@ __global__ void translateLidarDataFromRawToXYZkernel(char* rawLidarDataOnDevice,
 	 * meaning that every thread will have the pointer point to the xFFEE flag in the lidar data ouput (see VLP-16 user manual). In order to read the
 	 * azimuth value, the threads will read two bytes starting on  pointerToStartOfPacket+2. In order to know the azimuth values for the second half
 	 * of the threads (thread id 16-31), one has to interpolate the azimuth value for the next blocks azimuth value according to the formula: azimuth
-	 * = )nextBlockAzimuth - myAzimuth) / 2. Next block azimuth is read from pointerToStartOfPacket+102, for every block except block nr 899, where
+	 * = (nextBlockAzimuth - myAzimuth) / 2. Next block azimuth is read from pointerToStartOfPacket+102, for every block except block nr 899, where
 	 * that would read outside of the rawLidarData buffer (will try to read from position 90002). Therefore that block will read azimuths from position
 	 * rawLidarData +2, which is the same as pointerToStartOfPacket - 89898. Since the entire buffer represents one revolution, that will be ok
 	 */

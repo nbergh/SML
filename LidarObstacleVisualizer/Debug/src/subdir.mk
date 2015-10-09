@@ -8,20 +8,20 @@ CPP_SRCS += \
 
 CU_SRCS += \
 ../src/CudaErrorCheckFunctions.cu \
-../src/CudaFunctions.cu \
-../src/CudaFunctions2.cu \
+../src/CudaFunctionsForIdentifyingObstacles.cu \
+../src/CudaFunctionsForTranslatingLidarData.cu \
 ../src/LidarObstacleVisualizer.cu 
 
 CU_DEPS += \
 ./src/CudaErrorCheckFunctions.d \
-./src/CudaFunctions.d \
-./src/CudaFunctions2.d \
+./src/CudaFunctionsForIdentifyingObstacles.d \
+./src/CudaFunctionsForTranslatingLidarData.d \
 ./src/LidarObstacleVisualizer.d 
 
 OBJS += \
 ./src/CudaErrorCheckFunctions.o \
-./src/CudaFunctions.o \
-./src/CudaFunctions2.o \
+./src/CudaFunctionsForIdentifyingObstacles.o \
+./src/CudaFunctionsForTranslatingLidarData.o \
 ./src/LidarObstacleVisualizer.o \
 ./src/LidarUDPReceiver.o 
 

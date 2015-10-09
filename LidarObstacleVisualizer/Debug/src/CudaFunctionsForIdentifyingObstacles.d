@@ -1,4 +1,4 @@
-src/CudaFunctions2.o : ../src/CudaFunctions2.cu \
+src/CudaFunctionsForIdentifyingObstacles.o : ../src/CudaFunctionsForIdentifyingObstacles.cu \
     /usr/include/stdc-predef.h \
     /usr/local/cuda-7.5/bin/../targets/x86_64-linux/include/cuda_runtime.h \
     /usr/local/cuda-7.5/bin/../targets/x86_64-linux/include/host_config.h \
@@ -111,6 +111,5 @@ src/CudaFunctions2.o : ../src/CudaFunctions2.cu \
     /usr/local/cuda-7.5/bin/../targets/x86_64-linux/include/surface_indirect_functions.h \
     /usr/local/cuda-7.5/bin/../targets/x86_64-linux/include/surface_indirect_functions.hpp \
     /usr/local/cuda-7.5/bin/../targets/x86_64-linux/include/device_launch_parameters.h \
-    ../src/Headers/CudaFunctions.h \
     ../src/Headers/StructDefinitions.h \
     ../src/Headers/CudaErrorCheckFunctions.h

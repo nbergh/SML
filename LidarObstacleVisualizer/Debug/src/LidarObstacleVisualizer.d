@@ -121,6 +121,11 @@ src/LidarObstacleVisualizer.o : ../src/LidarObstacleVisualizer.cu \
     /usr/include/x86_64-linux-gnu/bits/wchar.h \
     /usr/include/GL/glu.h \
     /usr/include/GL/freeglut_ext.h \
+    /usr/include/unistd.h \
+    /usr/include/x86_64-linux-gnu/bits/posix_opt.h \
+    /usr/include/x86_64-linux-gnu/bits/environments.h \
+    /usr/include/x86_64-linux-gnu/bits/confname.h \
+    /usr/include/getopt.h \
     ../src/Headers/StructDefinitions.h \
     ../src/Headers/LidarUDPReceiver.h \
     /usr/include/pthread.h \

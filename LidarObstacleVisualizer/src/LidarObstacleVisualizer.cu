@@ -9,6 +9,7 @@
  */
 #include <GL/freeglut.h>
 #include <stdio.h>
+#include <unistd.h>
 
 #include "Headers/StructDefinitions.h"
 #include "Headers/LidarUDPReceiver.h"
@@ -17,8 +18,8 @@
 
 #define LIDAR_UDP_PORT 2368 // UDP listening port
 #define FRAMERATE 50 // The framerate for the openGL graphics
-#define MAX_OBSTACLE_DETECTION_RANGE 20 // The maximal distance (in meters) that an obstacle can be identified in meters
-#define OBSTACLE_RESOLUTION 0.01 // The resolution of the displayed obstacle matrix (in meters)
+#define MAX_OBSTACLE_DETECTION_RANGE 20 // The maximal distance (in meters) that an obstacle can be identified in
+#define OBSTACLE_RESOLUTION 0.05 // The resolution of the displayed obstacle matrix (in meters)
 #define MAX_NUMBER_OF_OBSTACLE_POINTS 5000 //The maximal number of obstacle points that can be displayed
 #define OBSTACLE_MIN_DELTA_Z 0.2 // The difference in z coordinates (in meters) required for two points with the same x and y coordinates to be registered as an obstacle
 
@@ -49,19 +50,21 @@ void allocateMemory() {
 	CUDA_CHECK_RETURN(cudaMallocHost((void**)&memoryPointers->obstacleData,memoryPointers->sizeOfObstacleData));
 	CUDA_CHECK_RETURN(cudaMalloc((void**)&memoryPointers->obstacleDataOnDevice,memoryPointers->sizeOfObstacleData));
 
-	// Finally the obstacle matrix is allocated on the device
-	memoryPointers->sizeOfObstacleMatrix = (2 * MAX_OBSTACLE_DETECTION_RANGE / OBSTACLE_RESOLUTION) * (2 * MAX_OBSTACLE_DETECTION_RANGE / OBSTACLE_RESOLUTION);
-	CUDA_CHECK_RETURN(cudaMalloc((void**)&memoryPointers->obstacleMatrixOnDevice,memoryPointers->sizeOfObstacleMatrix));
+	// Finally allocate the two obstacle matrices on the device
+	memoryPointers->sizeOfOneObstacleMatrix = (2 * MAX_OBSTACLE_DETECTION_RANGE / OBSTACLE_RESOLUTION) * (2 * MAX_OBSTACLE_DETECTION_RANGE / OBSTACLE_RESOLUTION);
+	CUDA_CHECK_RETURN(cudaMalloc((void**)&memoryPointers->obstacleMatrixForMaxZOnDevice,memoryPointers->sizeOfOneObstacleMatrix));
+	CUDA_CHECK_RETURN(cudaMalloc((void**)&memoryPointers->obstacleMatrixForMinZOnDevice,memoryPointers->sizeOfOneObstacleMatrix));
 }
 
 void freeMemory() {
-	free(memoryPointers->rawLidarData);
+	CUDA_CHECK_RETURN(cudaFreeHost((void*)memoryPointers->rawLidarData));
 	CUDA_CHECK_RETURN(cudaFree(memoryPointers->rawLidarDataOnDevice));
-	free(memoryPointers->locationLidarData);
+	CUDA_CHECK_RETURN(cudaFreeHost((void*)memoryPointers->locationLidarData));
 	CUDA_CHECK_RETURN(cudaFree(memoryPointers->locationLidarDataOnDevice));
-	free(memoryPointers->obstacleData);
+	CUDA_CHECK_RETURN(cudaFreeHost((void*)memoryPointers->obstacleData));
 	CUDA_CHECK_RETURN(cudaFree(memoryPointers->obstacleDataOnDevice));
-	CUDA_CHECK_RETURN(cudaFree(memoryPointers->obstacleMatrixOnDevice));
+	CUDA_CHECK_RETURN(cudaFree(memoryPointers->obstacleMatrixForMaxZOnDevice));
+	CUDA_CHECK_RETURN(cudaFree(memoryPointers->obstacleMatrixForMinZOnDevice));
 	free(memoryPointers);
 	free(cameraPosition);
 	free(keysAndMouseState);
@@ -89,10 +92,6 @@ void setUpDisplay() {
 	glViewport(0, 0, glutGet(GLUT_SCREEN_WIDTH), glutGet(GLUT_SCREEN_HEIGHT));
 	// Set the correct perspective.
 	gluPerspective(45.0f, glutGet(GLUT_SCREEN_WIDTH)/(double) glutGet(GLUT_SCREEN_HEIGHT), 0.1f, 100.0f);
-
-	// Set the pointer to location lidar data
-	glVertexPointer( 3, GL_FLOAT, sizeof(LidarDataPoint), &memoryPointers->locationLidarData->x ); // Set the vertex pointer
-	glPointSize( 2.0 );
 }
 
 
@@ -108,6 +107,10 @@ void drawDisplay(void) {
 
 	// Clear Color and Depth Buffers
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	// Set the openGL vertex pointer to location lidar data (later called by glDrawArrays)
+	glVertexPointer(3, GL_FLOAT, sizeof(LidarDataPoint), &memoryPointers->locationLidarData->x);
+	glPointSize(2.0);
 
 	glEnableClientState( GL_VERTEX_ARRAY );
     glDrawArrays( GL_POINTS, 0, 28800 ); // Draws all the points from the LIDAR
@@ -172,14 +175,11 @@ int main(int argc, char** argv)
 	LidarUDPReceiver lidarUDPReceiver(LIDAR_UDP_PORT);
 	pthread_t udpReceiverThreadID = lidarUDPReceiver.startReceiverThread(memoryPointers->rawLidarData);
 
-	memoryPointers->locationLidarData[0].x=0.1;
-	memoryPointers->locationLidarData[0].y=0.1;
-	memoryPointers->locationLidarData[0].z=0.1;
-	memoryPointers->locationLidarData[1].x=0.2;
-	memoryPointers->locationLidarData[1].y=0.2;
-	memoryPointers->locationLidarData[1].z=0.2;
+	//translateLidarDataFromRawToXYZ(memoryPointers);
+	//identifyObstaclesInLidarData(memoryPointers,MAX_NUMBER_OF_OBSTACLE_POINTS);
 
 	// Init glut and create window
+
 	glutInit(&argc, argv);
 	glutInitDisplayMode(GLUT_DEPTH | GLUT_DOUBLE | GLUT_RGBA);
 	glutInitWindowPosition(0,0);
@@ -204,12 +204,13 @@ int main(int argc, char** argv)
 	// Enter GLUT event processing cycle
 	glutMainLoop();
 
-	// Free allocated data
-	//freeMemory();
 
 	// Exit the UDP receiver thread
 	lidarUDPReceiver.setThreadExitFlag();
 	pthread_join(udpReceiverThreadID,NULL);
+
+	// Free allocated data
+	freeMemory();
 	printf("Main exited\n");
 	return 0;
 }

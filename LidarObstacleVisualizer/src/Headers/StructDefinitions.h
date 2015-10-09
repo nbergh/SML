@@ -44,8 +44,9 @@ struct MemoryPointers {
 	ObstaclePoint *obstacleData, *obstacleDataOnDevice;
 	int sizeOfObstacleData;
 
-	char *obstacleMatrixOnDevice;
-	int sizeOfObstacleMatrix;
+	char *obstacleMatrixForMaxZOnDevice;
+	char *obstacleMatrixForMinZOnDevice;
+	int sizeOfOneObstacleMatrix;
 };
 
 #endif /* STRUCTDEFINITIONS_H_ */
