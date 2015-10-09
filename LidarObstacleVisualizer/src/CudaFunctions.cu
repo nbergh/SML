@@ -1,0 +1,83 @@
+#include <math.h>
+
+#include "Headers/CudaFunctions.h"
+#include "Headers/CudaErrorCheckFunctions.h"
+
+__device__ int getShort(char* atLocation) {
+	// 2 chars to int
+	return ((*(atLocation+1) & 0xFF)<<8) | (*atLocation & 0xFF);
+}
+
+__device__ double getAzimuth(char* atLocation) {
+	// In radians
+	return ((double) getShort(atLocation))*2*M_PI/36000;
+}
+
+__device__ double getDistance(char* atLocation) {
+	// In meters
+	return ((double) getShort(atLocation))*0.002;
+}
+
+__device__ double getVerticalAngle(int laserIndex) {
+	// Returns the vertical angle of the laser with index laserIndex
+	switch(laserIndex) {
+		case 0: return -15*(M_PI*2/360);
+		case 1: return 1*(M_PI*2/360);
+		case 2: return -13*(M_PI*2/360);
+		case 3: return -3*(M_PI*2/360);
+		case 4: return -11*(M_PI*2/360);
+		case 5: return 5*(M_PI*2/360);
+		case 6: return -9*(M_PI*2/360);
+		case 7: return 7*(M_PI*2/360);
+		case 8: return -7*(M_PI*2/360);
+		case 9: return 9*(M_PI*2/360);
+		case 10: return -5*(M_PI*2/360);
+		case 11: return 11*(M_PI*2/360);
+		case 12: return -3*(M_PI*2/360);
+		case 13: return 13*(M_PI*2/360);
+		case 14: return -1*(M_PI*2/360);
+		case 15: return 15*(M_PI*2/360);
+	}
+	return 0;
+}
+	// MAKE POINTERS CONST
+__global__ void translateLidarDataFromRawToXYZkernel(char* rawLidarDataOnDevice, LidarDataPoint *locationLidarDataOnDevice) {
+	/* There are 900 blocks with 32 threads each in this kernel. The rawLidarDataOnDevice contains data from 75 packets from the lidar sensor
+	 * Each block will therefore process 1/12th of a packet (75/900). Every thread in a block must know the pointer to the start of the lidar
+	 * reading in the rawLidarData. This is accomplished by adding 100*blockId.x to rawLidarDataOnDevice. This is a shared variable in the block
+	 * meaning that every thread will have the pointer point to the xFFEE flag in the lidar data ouput (see VLP-16 user manual). In order to read the
+	 * azimuth value, the threads will read two bytes starting on  pointerToStartOfPacket+2. In order to know the azimuth values for the second half
+	 * of the threads (thread id 16-31), one has to interpolate the azimuth value for the next blocks azimuth value according to the formula: azimuth
+	 * = )nextBlockAzimuth - myAzimuth) / 2. Next block azimuth is read from pointerToStartOfPacket+102, for every block except block nr 899, where
+	 * that would read outside of the rawLidarData buffer (will try to read from position 90002). Therefore that block will read azimuths from position
+	 * rawLidarData +2, which is the same as pointerToStartOfPacket - 89898. Since the entire buffer represents one revolution, that will be ok
+	 */
+	__shared__ char* pointerToStartOfPacket;
+	__shared__ double blockAzimuthAngle, deltaAzimuth;
+	pointerToStartOfPacket= rawLidarDataOnDevice + 100*blockIdx.x;
+	blockAzimuthAngle = getAzimuth(pointerToStartOfPacket+2);
+	deltaAzimuth = (getAzimuth(pointerToStartOfPacket + ((blockIdx.x==899) ? -89898 : 102)) - blockAzimuthAngle)/2;
+
+	double myHorizontalAngle = (threadIdx.x > 15) ? blockAzimuthAngle : blockAzimuthAngle + deltaAzimuth;
+ 	double myVerticalAngle = getVerticalAngle(threadIdx.x%16);
+	double myDistance = getDistance(pointerToStartOfPacket + 4 + 3*threadIdx.x);
+
+	int myThreadNr = blockIdx.x * blockDim.x + threadIdx.x;
+	(locationLidarDataOnDevice + myThreadNr)->x = myDistance * cos(myVerticalAngle) * sin (myHorizontalAngle);
+	(locationLidarDataOnDevice + myThreadNr)->y = myDistance * cos(myVerticalAngle) * cos (myHorizontalAngle);
+	(locationLidarDataOnDevice + myThreadNr)->z = myDistance * sin(myVerticalAngle);
+}
+
+
+
+void translateLidarDataFromRawToXYZ(MemoryPointers* memoryPointers) {
+	// First copy the raw lidar data from the host to the device
+	CUDA_CHECK_RETURN(cudaMemcpy(memoryPointers->rawLidarDataOnDevice, memoryPointers->rawLidarData, memoryPointers->sizeOfRawLidarData, cudaMemcpyHostToDevice));
+
+	// The kernel function uses 900 blocks with 32 threads each. Each block will process 32 laser readings, which corresponds to two laser shootings.
+	translateLidarDataFromRawToXYZkernel<<<900,32>>> (memoryPointers->rawLidarDataOnDevice,memoryPointers->locationLidarDataOnDevice);
+
+	// Copy the xyz lidar data back to the device for openGL visualization
+	CUDA_CHECK_RETURN(cudaMemcpy(memoryPointers->locationLidarData, memoryPointers->locationLidarDataOnDevice, memoryPointers->sizeOfLocationLidarData, cudaMemcpyDeviceToHost));
+	cudaDeviceSynchronize(); // Wait for the device to finish all its work
+}

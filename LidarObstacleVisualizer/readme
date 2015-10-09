@@ -1,0 +1,12 @@
+To compile and run this code you need:
+
+-An Nvidia graphics card with CUDA capability on your computer
+-Use Linux (with X-window system installed)
+-Have CUDA installed, see https://developer.nvidia.com/cuda-downloads
+-Have freeglut installed (do sudo apt-get install freeglut3-dev on Debian/Ubuntu)
+
+To compile the code, then go to ./Debug and run "make all"
+
+Make sure the lidar sends its data on port 2368
+
+Click and drag to pan camera, zoom with scroll wheel, and type 'q' to quit
