@@ -112,4 +112,10 @@ src/CudaFunctionsForIdentifyingObstacles.o : ../src/CudaFunctionsForIdentifyingO
     /usr/local/cuda-7.5/bin/../targets/x86_64-linux/include/surface_indirect_functions.hpp \
     /usr/local/cuda-7.5/bin/../targets/x86_64-linux/include/device_launch_parameters.h \
     ../src/Headers/StructDefinitions.h \
+    /usr/include/GL/gl.h \
+    /usr/include/GL/glext.h \
+    /usr/include/inttypes.h \
+    /usr/lib/gcc/x86_64-linux-gnu/4.8/include/stdint.h \
+    /usr/include/stdint.h \
+    /usr/include/x86_64-linux-gnu/bits/wchar.h \
     ../src/Headers/CudaErrorCheckFunctions.h

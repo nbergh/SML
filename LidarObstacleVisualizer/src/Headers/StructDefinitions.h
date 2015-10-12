@@ -1,19 +1,11 @@
-/*
- * StructDefinitions.h
- *
- *  Created on: Oct 4, 2015
- *      Author: sml-linux
- */
-
 #ifndef STRUCTDEFINITIONS_H_
 #define STRUCTDEFINITIONS_H_
 
-struct LidarDataPoint {
-	// Simple struct for representing a lidar data point
-	float x,y,z; // In meters
-};
-struct ObstaclePoint {
-	float x,y; // In meters
+#include <GL/gl.h>
+
+struct OpenGLvertex {
+	// This struct represents an openGL vertex with 3 coordinates
+	GLfloat x,y,z;
 };
 
 struct CameraPosition {
@@ -28,7 +20,7 @@ struct CameraPosition {
 
 struct KeysAndMouseState {
 	// Keys and mouse state for openGL visualization
-	bool leftButtonIsPressed;
+	bool leftButtonIsPressed,forwardKeyIsPressed,backwardKeyIsPressed,leftStrafeKeyIsPressed,rightStrafeKeyIsPressed,upStrafeKeyIsPressed,downStrafeKeyIsPressed;
 	int mousePosXwhenPressed;
 	int mousePosYwhenPressed;
 };
@@ -38,15 +30,18 @@ struct MemoryPointers {
 	char *rawLidarData, *rawLidarDataOnDevice;
 	int sizeOfRawLidarData;
 
-	LidarDataPoint *locationLidarData, *locationLidarDataOnDevice;
-	int sizeOfLocationLidarData;
+	OpenGLvertex *lidarPoints, *lidarPointsOnDevice;
+	int sizeOfLidarPoints;
 
-	ObstaclePoint *obstacleData, *obstacleDataOnDevice;
-	int sizeOfObstacleData;
+	OpenGLvertex *obstacleSquares, *obstacleSquaresOnDevice;
+	GLuint* obstacleSquareIndexesArray;
+	int sizeOfObstacleSquares,sizeOfObstacleSquareIndexesArray;
 
-	char *obstacleMatrixForMaxZOnDevice;
-	char *obstacleMatrixForMinZOnDevice;
-	int sizeOfOneObstacleMatrix;
+	int *obstacleMatrixForMaxZOnDevice;
+	int *obstacleMatrixForMinZOnDevice;
+	int sizeOfObstacleMatrix,numberOfMatrixFieldsPerSide;
+
+	int currentNrOfObstacles; // The number of obstacles to be displayed in the current frame
 };
 
 #endif /* STRUCTDEFINITIONS_H_ */

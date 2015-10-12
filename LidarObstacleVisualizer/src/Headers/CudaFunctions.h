@@ -8,6 +8,7 @@
 #include "StructDefinitions.h"
 
 void translateLidarDataFromRawToXYZ(MemoryPointers* memoryPointers);
-void identifyObstaclesInLidarData(MemoryPointers* memoryPointers, int maxNrOfObstacles);
+void intializeObstacleSquareIndexesArray(MemoryPointers* memoryPointers, int maxNrOfObstacles);
+void identifyObstaclesInLidarData(MemoryPointers* memoryPointers,float obstaclePointSideLength,float minObstacleDeltaZ, int maxNumberOfObstacles);
 
 #endif /* CUDAFUNCTIONS_H_ */

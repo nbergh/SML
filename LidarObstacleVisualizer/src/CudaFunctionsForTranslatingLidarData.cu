@@ -10,7 +10,7 @@ __device__ int getShort(char* atLocation) {
 
 __device__ double getAzimuth(char* atLocation) {
 	// In radians
-	return ((double) getShort(atLocation))*2*M_PI/36000;
+	return ((double) getShort(atLocation))*2*M_PI/36000.0;
 }
 
 __device__ double getDistance(char* atLocation) {
@@ -21,27 +21,27 @@ __device__ double getDistance(char* atLocation) {
 __device__ double getVerticalAngle(int laserIndex) {
 	// Returns the vertical angle of the laser with index laserIndex
 	switch(laserIndex) {
-		case 0: return -15*(M_PI*2/360);
-		case 1: return 1*(M_PI*2/360);
-		case 2: return -13*(M_PI*2/360);
-		case 3: return -3*(M_PI*2/360);
-		case 4: return -11*(M_PI*2/360);
-		case 5: return 5*(M_PI*2/360);
-		case 6: return -9*(M_PI*2/360);
-		case 7: return 7*(M_PI*2/360);
-		case 8: return -7*(M_PI*2/360);
-		case 9: return 9*(M_PI*2/360);
-		case 10: return -5*(M_PI*2/360);
-		case 11: return 11*(M_PI*2/360);
-		case 12: return -3*(M_PI*2/360);
-		case 13: return 13*(M_PI*2/360);
-		case 14: return -1*(M_PI*2/360);
-		case 15: return 15*(M_PI*2/360);
+		case 0: return -15*(M_PI*2/360.0);
+		case 1: return 1*(M_PI*2/360.0);
+		case 2: return -13*(M_PI*2/360.0);
+		case 3: return -3*(M_PI*2/360.0);
+		case 4: return -11*(M_PI*2/360.0);
+		case 5: return 5*(M_PI*2/360.0);
+		case 6: return -9*(M_PI*2/360.0);
+		case 7: return 7*(M_PI*2/360.0);
+		case 8: return -7*(M_PI*2/360.0);
+		case 9: return 9*(M_PI*2/360.0);
+		case 10: return -5*(M_PI*2/360.0);
+		case 11: return 11*(M_PI*2/360.0);
+		case 12: return -3*(M_PI*2360.0);
+		case 13: return 13*(M_PI*2/360.0);
+		case 14: return -1*(M_PI*2/360.0);
+		case 15: return 15*(M_PI*2/360.0);
 	}
 	return 0;
 }
 	// MAKE POINTERS CONST
-__global__ void translateLidarDataFromRawToXYZkernel(char* rawLidarDataOnDevice, LidarDataPoint *locationLidarDataOnDevice) {
+__global__ void translateLidarDataFromRawToXYZkernel(char* rawLidarDataOnDevice, OpenGLvertex *lidarPointsOnDevice) {
 	/* There are 900 blocks with 32 threads each in this kernel. The rawLidarDataOnDevice contains data from 75 packets from the lidar sensor
 	 * Each block will therefore process 1/12th of a packet (75/900). Every thread in a block must know the pointer to the start of the lidar
 	 * reading in the rawLidarData. This is accomplished by adding 100*blockId.x to rawLidarDataOnDevice. This is a shared variable in the block
@@ -56,16 +56,16 @@ __global__ void translateLidarDataFromRawToXYZkernel(char* rawLidarDataOnDevice,
 	__shared__ double blockAzimuthAngle, deltaAzimuth;
 	pointerToStartOfPacket= rawLidarDataOnDevice + 100*blockIdx.x;
 	blockAzimuthAngle = getAzimuth(pointerToStartOfPacket+2);
-	deltaAzimuth = (getAzimuth(pointerToStartOfPacket + ((blockIdx.x==899) ? -89898 : 102)) - blockAzimuthAngle)/2;
+	deltaAzimuth = (getAzimuth(pointerToStartOfPacket + ((blockIdx.x==899) ? -89898 : 102)) - blockAzimuthAngle)/2.0;
 
 	double myHorizontalAngle = (threadIdx.x > 15) ? blockAzimuthAngle : blockAzimuthAngle + deltaAzimuth;
  	double myVerticalAngle = getVerticalAngle(threadIdx.x%16);
 	double myDistance = getDistance(pointerToStartOfPacket + 4 + 3*threadIdx.x);
 
 	int myThreadNr = blockIdx.x * blockDim.x + threadIdx.x;
-	(locationLidarDataOnDevice + myThreadNr)->x = myDistance * cos(myVerticalAngle) * sin (myHorizontalAngle);
-	(locationLidarDataOnDevice + myThreadNr)->y = myDistance * cos(myVerticalAngle) * cos (myHorizontalAngle);
-	(locationLidarDataOnDevice + myThreadNr)->z = myDistance * sin(myVerticalAngle);
+	(lidarPointsOnDevice + myThreadNr)->x = myDistance * cos(myVerticalAngle) * sin (myHorizontalAngle);
+	(lidarPointsOnDevice + myThreadNr)->y = myDistance * cos(myVerticalAngle) * cos (myHorizontalAngle);
+	(lidarPointsOnDevice + myThreadNr)->z = myDistance * sin(myVerticalAngle);
 }
 
 
@@ -75,9 +75,9 @@ void translateLidarDataFromRawToXYZ(MemoryPointers* memoryPointers) {
 	CUDA_CHECK_RETURN(cudaMemcpy(memoryPointers->rawLidarDataOnDevice, memoryPointers->rawLidarData, memoryPointers->sizeOfRawLidarData, cudaMemcpyHostToDevice));
 
 	// The kernel function uses 900 blocks with 32 threads each. Each block will process 32 laser readings, which corresponds to two laser shootings.
-	translateLidarDataFromRawToXYZkernel<<<900,32>>> (memoryPointers->rawLidarDataOnDevice,memoryPointers->locationLidarDataOnDevice);
+	translateLidarDataFromRawToXYZkernel<<<900,32>>> (memoryPointers->rawLidarDataOnDevice,memoryPointers->lidarPointsOnDevice);
 
 	// Copy the xyz lidar data back to the device for openGL visualization
-	CUDA_CHECK_RETURN(cudaMemcpy(memoryPointers->locationLidarData, memoryPointers->locationLidarDataOnDevice, memoryPointers->sizeOfLocationLidarData, cudaMemcpyDeviceToHost));
+	CUDA_CHECK_RETURN(cudaMemcpy(memoryPointers->lidarPoints, memoryPointers->lidarPointsOnDevice, memoryPointers->sizeOfLidarPoints, cudaMemcpyDeviceToHost));
 	cudaDeviceSynchronize(); // Wait for the device to finish all its work
 }
