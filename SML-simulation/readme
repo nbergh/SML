@@ -1,0 +1,3 @@
+This software simulates a traffic merging scenario and V2V communication between vehicles.
+To run go to ./jar and write java -jar V2Vmerge.jar 
+You can also import the project in Eclipse and run it from there
