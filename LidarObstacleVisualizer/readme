@@ -10,5 +10,3 @@ To compile the code, then go to ./Debug and run "make all"
 Make sure the lidar sends its data on port 2368, or change the port in LidarObstacleVisualizer.cu a recompile
 
 Click and drag to pan camera, zoom with scroll wheel, and type 'q' to quit
-
-To see a demo on how this looks if you get it to work see https://www.youtube.com/watch?v=yWAGOXomGlw 
