@@ -25,6 +25,24 @@ struct KeysAndMouseState {
 	int mousePosYwhenPressed;
 };
 
+struct GPSpoint {
+	double latc, longc; // Lat and long coords for the GPSpoint. Always in decimal degrees
+};
+
+struct Path {
+	// A struct representing a path as a linked list of gps points
+	GPSpoint* myGPSpoint;
+	Path* nextPoint;
+};
+
+struct VehicleState {
+	// TODO make separate structs for all sensor data
+	GPSpoint* currentGPSposition; // This is maintained by both the GPS and IMU
+	double currentHeading; // The current heading
+	int gpsTimeStamp; // Timestamp of the time when the GPS was last updated, usec from gettimeofday()
+	// Add more stuff
+};
+
 struct MemoryPointers {
 	// A struct to holds all the pointers and the sizes of allocated memory blocks
 	char *rawLidarData, *rawLidarDataOnDevice;
@@ -40,6 +58,11 @@ struct MemoryPointers {
 	int *obstacleMatrixForMaxZOnDevice;
 	int *obstacleMatrixForMinZOnDevice;
 	int sizeOfObstacleMatrix,numberOfMatrixFieldsPerSide;
+
+	OpenGLvertex* pathPoints; // Representation of the path local coordinates for displaying
+	int sizeOfPathPoints;
+
+	VehicleState* vehicleState; // The current state of the vehicle
 
 	int currentNrOfObstacles; // The number of obstacles to be displayed in the current frame
 };

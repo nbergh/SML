@@ -163,6 +163,8 @@ void identifyObstaclesInLidarData(MemoryPointers* memoryPointers, float obstacle
 	// Set the number of obstacles idenitified in memoryPointers->currentNrOfObstacles
 	int nrOfObstacles;
 	CUDA_CHECK_RETURN(cudaMemcpy(&nrOfObstacles, deviceObstacleArrayIndex, sizeof(int), cudaMemcpyDeviceToHost));
+	CUDA_CHECK_RETURN(cudaFree(deviceObstacleArrayIndex)); // TODO this shouldnt be done every iteration
+
 	memoryPointers->currentNrOfObstacles = nrOfObstacles;
 	cudaDeviceSynchronize();
 }

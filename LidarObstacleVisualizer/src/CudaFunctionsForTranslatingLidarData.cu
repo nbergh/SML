@@ -47,16 +47,16 @@ __global__ void translateLidarDataFromRawToXYZkernel(char* rawLidarDataOnDevice,
 	 * reading in the rawLidarData. This is accomplished by adding 100*blockId.x to rawLidarDataOnDevice. This is a shared variable in the block
 	 * meaning that every thread will have the pointer point to the xFFEE flag in the lidar data ouput (see VLP-16 user manual). In order to read the
 	 * azimuth value, the threads will read two bytes starting on  pointerToStartOfPacket+2. In order to know the azimuth values for the second half
-	 * of the threads (thread id 16-31), one has to interpolate the azimuth value for the next blocks azimuth value according to the formula: azimuth
-	 * = (nextBlockAzimuth - myAzimuth) / 2. Next block azimuth is read from pointerToStartOfPacket+102, for every block except block nr 899, where
-	 * that would read outside of the rawLidarData buffer (will try to read from position 90002). Therefore that block will read azimuths from position
-	 * rawLidarData +2, which is the same as pointerToStartOfPacket - 89898. Since the entire buffer represents one revolution, that will be ok
+	 * of the threads (thread id 16-31), one has to interpolate the azimuth value for the previous blocks azimuth value according to the formula: azimuth
+	 * = (myAzimuth - prevBlockAzimuth) / 2. Previous block azimuth is read from pointerToStartOfPacket-98, for every block except block nr 0, where
+	 * that would read outside of the rawLidarData buffer (will try to read from position -98). Therefore that block will read azimuths from position
+	 * rawLidarData + 89902, which is the same as pointerToStartOfPacket + 89902. Since the entire buffer represents one revolution, that will be ok
 	 */
 	__shared__ char* pointerToStartOfPacket;
 	__shared__ double blockAzimuthAngle, deltaAzimuth;
 	pointerToStartOfPacket= rawLidarDataOnDevice + 100*blockIdx.x;
 	blockAzimuthAngle = getAzimuth(pointerToStartOfPacket+2);
-	deltaAzimuth = (getAzimuth(pointerToStartOfPacket + ((blockIdx.x==899) ? -89898 : 102)) - blockAzimuthAngle)/2.0;
+	deltaAzimuth = (blockAzimuthAngle - getAzimuth(pointerToStartOfPacket + ((blockIdx.x==0) ? 89902 : -98)))/2.0;
 
 	double myHorizontalAngle = (threadIdx.x > 15) ? blockAzimuthAngle : blockAzimuthAngle + deltaAzimuth;
  	double myVerticalAngle = getVerticalAngle(threadIdx.x%16);
