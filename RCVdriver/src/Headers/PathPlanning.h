@@ -65,7 +65,7 @@ class PathPlanning {
 	// Functions
 	void discoverNeighbor(aStarNode* baseNode, aStarNode* targetNode, int index, OpenGLvertex* obstacleSquaresOnDevice, int nrOfObstacles, float minDistanceToObstacle, float obstacleMatrixResolution);
 	void generatePath(float targetX, float targetY, OpenGLvertex* obstacleSquaresOnDevice, int nrOfObstacles, float minDistanceToObstacle, float obstacleMatrixResolution);
-	void buildPath()
+	void buildPath(); // TODO implement
 
 	public:
 		PathPlanning(VehicleState* vehicleState, Path* mainGPSpath);

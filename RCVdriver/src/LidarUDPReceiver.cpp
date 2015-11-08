@@ -6,7 +6,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
-//#include <sys/time.h>
+#include <sys/time.h>
 
 void* LidarUDPReceiver::threadEntryFunction(void* thisPointer) {
 	// A static entry function for receiveUDP

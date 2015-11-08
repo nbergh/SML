@@ -57,7 +57,6 @@ __global__ void translateLidarDataFromRawToXYZkernel(char* rawLidarDataOnDevice,
 	pointerToStartOfPacket= rawLidarDataOnDevice + 100*blockIdx.x;
 	blockAzimuthAngle = getAzimuth(pointerToStartOfPacket+2);
 	deltaAzimuth = (blockAzimuthAngle - getAzimuth(pointerToStartOfPacket + ((blockIdx.x==0) ? 89902 : -98)))/2.0;
-	//deltaAzimuth = (getAzimuth(pointerToStartOfPacket + ((blockIdx.x==899) ? -89898 : 102)) - blockAzimuthAngle)/2.0;
 
 	double myHorizontalAngle = (threadIdx.x > 15) ? blockAzimuthAngle : blockAzimuthAngle + deltaAzimuth;
  	double myVerticalAngle = getVerticalAngle(threadIdx.x%16);

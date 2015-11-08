@@ -22,6 +22,7 @@
 #define OBSTACLE_POINT_SIDE_LENGTH 0.05 // The length of one side in the square that represents an obstacle point (decreasing this value by a factor of X will require X² times more device memory)
 #define MIN_OBSTACLE_DELTA_Z 0.1 // The difference in z coordinates (in meters) required for two points with the same x and y coordinates to be registered as an obstacle
 #define MAX_NUMBER_OF_OBSTACLES 5000 //The maximal number of obstacle points that can be displayed
+#define POINTS_IN_PATH 40 // The number of points to be used in the vehicle path
 
 MemoryPointers* memoryPointers;
 CameraPosition* cameraPosition;
@@ -47,14 +48,14 @@ void allocateMemory() {
 	CUDA_CHECK_RETURN(cudaMalloc((void**)&memoryPointers->lidarPointsOnDevice,memoryPointers->sizeOfLidarPoints));
 
 	// Third is the data that hold the obstacles. Each obstacle is represented as a square (4 vertices) in the graphics
-	// and 6 bytes of index data needed by glDrawElements
+	// and 6 ints of index data needed by glDrawElements
 	memoryPointers->sizeOfObstacleSquares = MAX_NUMBER_OF_OBSTACLES*4*sizeof(OpenGLvertex);
 	CUDA_CHECK_RETURN(cudaMallocHost((void**)&memoryPointers->obstacleSquares,memoryPointers->sizeOfObstacleSquares));
 	CUDA_CHECK_RETURN(cudaMalloc((void**)&memoryPointers->obstacleSquaresOnDevice,memoryPointers->sizeOfObstacleSquares));
 	memoryPointers->sizeOfObstacleSquareIndexesArray = MAX_NUMBER_OF_OBSTACLES*6*sizeof(GLuint);
 	CUDA_CHECK_RETURN(cudaMallocHost((void**)&memoryPointers->obstacleSquareIndexesArray,memoryPointers->sizeOfObstacleSquareIndexesArray));
 
-	// Finally allocate the two obstacle matrices on the device
+	// Allocate the two obstacle matrices on the device
 	memoryPointers->numberOfMatrixFieldsPerSide = 2 * MAX_OBSTACLE_DETECTION_DISTANCE / OBSTACLE_POINT_SIDE_LENGTH; // As an integer
 	memoryPointers->sizeOfObstacleMatrix = memoryPointers->numberOfMatrixFieldsPerSide * memoryPointers->numberOfMatrixFieldsPerSide*sizeof(int);
 	CUDA_CHECK_RETURN(cudaMalloc((void**)&memoryPointers->obstacleMatrixForMaxZOnDevice,memoryPointers->sizeOfObstacleMatrix));
@@ -63,6 +64,15 @@ void allocateMemory() {
 	// Now zero out obstacleSquaresOnDevice and intialize obstacleSquareIndexes:
 	CUDA_CHECK_RETURN(cudaMemset(memoryPointers->obstacleSquaresOnDevice,0,memoryPointers->sizeOfObstacleSquares));
 	intializeObstacleSquareIndexesArray(memoryPointers,MAX_NUMBER_OF_OBSTACLES);
+
+	// Allocate data for the path
+	memoryPointers->sizeOfPathPoints = POINTS_IN_PATH * sizeof(OpenGLvertex);
+	CUDA_CHECK_RETURN(cudaMallocHost((void**)&memoryPointers->pathPoints,memoryPointers->sizeOfPathPoints));
+	memset(memoryPointers->pathPoints,0,memoryPointers->sizeOfPathPoints);
+
+	// Allocate the vehicle state
+	memoryPointers->vehicleState = new VehicleState;
+	memset(memoryPointers->vehicleState,0,sizeof(VehicleState));
 }
 
 void freeMemory() {
@@ -75,6 +85,8 @@ void freeMemory() {
 	CUDA_CHECK_RETURN(cudaFreeHost((void*)memoryPointers->obstacleSquareIndexesArray));
 	CUDA_CHECK_RETURN(cudaFree(memoryPointers->obstacleMatrixForMaxZOnDevice));
 	CUDA_CHECK_RETURN(cudaFree(memoryPointers->obstacleMatrixForMinZOnDevice));
+	CUDA_CHECK_RETURN(cudaFreeHost(memoryPointers->pathPoints));
+	CUDA_CHECK_RETURN(cudaFreeHost(memoryPointers->vehicleState));
 	free(memoryPointers);
 	free(cameraPosition);
 	free(keysAndMouseState);
@@ -217,16 +229,21 @@ void drawDisplay(void) {
 
 	// Draw the lidar points:
 	glColor3f(1.0f,1.0f,1.0f); // Set to white
-	glPointSize(2.0);
 	glVertexPointer(3, GL_FLOAT, sizeof(OpenGLvertex), &memoryPointers->lidarPoints->x);
     glDrawArrays( GL_POINTS, 0, 28800 ); // Draws all the points from the LIDAR
+
+    // Draw the path:
+    glColor3f(1.0f,1.0f,0.0f); // Set to green
+	glVertexPointer(2, GL_FLOAT, sizeof(OpenGLvertex), &memoryPointers->pathPoints->x);
+    glDrawArrays( GL_POINTS, 0, POINTS_IN_PATH ); // Draw the path points
+
+    glDisableClientState( GL_VERTEX_ARRAY );
 
     // Draw the obstacle squares:
     glColor3f(1.0f,0.0f,0.0f); // Set the color of all the obstaclesquares to red
     glVertexPointer(3,GL_FLOAT,sizeof(OpenGLvertex),&memoryPointers->obstacleSquares->x);
     glDrawElements(GL_TRIANGLES,6*memoryPointers->currentNrOfObstacles,GL_UNSIGNED_INT,memoryPointers->obstacleSquareIndexesArray);
-
-    glDisableClientState( GL_VERTEX_ARRAY );
+    //TODO change above to glDrawArrays(GL_TRIANGLE_STRIP,,)
 
     //glFlush();
 	glutSwapBuffers();
@@ -239,6 +256,7 @@ void setUpDisplay() {
 	glViewport(0, 0, glutGet(GLUT_SCREEN_WIDTH), glutGet(GLUT_SCREEN_HEIGHT));
 	// Set the correct perspective.
 	gluPerspective(45.0f, glutGet(GLUT_SCREEN_WIDTH)/(double) glutGet(GLUT_SCREEN_HEIGHT), 0.1f, 100.0f);
+	glPointSize(2.0);
 }
 
 int main(int argc, char** argv)
@@ -250,31 +268,33 @@ int main(int argc, char** argv)
 	LidarUDPReceiver lidarUDPReceiver(LIDAR_UDP_PORT);
 	pthread_t udpReceiverThreadID = lidarUDPReceiver.startReceiverThread(memoryPointers->rawLidarData);
 
-	// Init glut and create window
-	glutInit(&argc, argv);
-	glutInitDisplayMode(GLUT_DEPTH | GLUT_DOUBLE | GLUT_RGBA);
-	glutInitWindowPosition(0,0);
-	glutInitWindowSize(1000,1000);
-	glutCreateWindow("Lidar 3D visualization");
-	glutFullScreen();
+//	// Init glut and create window
+//	glutInit(&argc, argv);
+//	glutInitDisplayMode(GLUT_DEPTH | GLUT_DOUBLE | GLUT_RGBA);
+//	glutInitWindowPosition(0,0);
+//	glutInitWindowSize(1000,1000);
+//	glutCreateWindow("Lidar 3D visualization");
+//	glutFullScreen();
+//
+//	// Set up the openGL projection matrix
+//	setUpDisplay();
+//
+//	// Register callbacks
+//	glutDisplayFunc(drawDisplay);
+//	glutKeyboardFunc(handleKeyDown);
+//	glutKeyboardUpFunc(handleKeyUp);
+//	glutMouseFunc(handleMouseClick);
+//	glutMotionFunc(handleMouseMove);
+//	glutTimerFunc(0,updateFrame,0); // The frame update function (all the work is carried out here)
+//
+//	// Set glut and opengl options:
+//	glutSetOption(GLUT_ACTION_ON_WINDOW_CLOSE,GLUT_ACTION_GLUTMAINLOOP_RETURNS);
+//	glEnable(GL_DEPTH_TEST);
+//
+//	// Enter GLUT event processing cycle
+//	glutMainLoop();
 
-	// Set up the openGL projection matrix
-	setUpDisplay();
 
-	// Register callbacks
-	glutDisplayFunc(drawDisplay);
-	glutKeyboardFunc(handleKeyDown);
-	glutKeyboardUpFunc(handleKeyUp);
-	glutMouseFunc(handleMouseClick);
-	glutMotionFunc(handleMouseMove);
-	glutTimerFunc(0,updateFrame,0); // The frame update function (all the work is carried out here)
-
-	// Set glut and opengl options:
-	glutSetOption(GLUT_ACTION_ON_WINDOW_CLOSE,GLUT_ACTION_GLUTMAINLOOP_RETURNS);
-	glEnable(GL_DEPTH_TEST);
-
-	// Enter GLUT event processing cycle
-	glutMainLoop();
 
 	// Exit the UDP receiver thread
 	lidarUDPReceiver.setThreadExitFlag();
