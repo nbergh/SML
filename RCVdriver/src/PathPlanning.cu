@@ -7,9 +7,174 @@
 #include <sys/time.h>
 
 // Non-member function declarations
-bool checkIfNodesAreToCloseToObstacles(aStarNode* nodes, int nrOfNodes, OpenGLvertex* obstacleSquaresOnDevice, int nrOfObstacles, float minDistanceToObstacle, float obstacleMatrixResolution);
+bool checkIfNodesAreToCloseToObstacles(aStarNode* nodes, int nrOfNodes, ObstaclePoint* obstacleSquaresOnDevice, int nrOfObstacles, float minDistanceToObstacle, float obstacleMatrixResolution);
+
+
+// PathPlanning:
+PathPlanning::PathPlanning(VehicleState* vehicleState) {
+	this->vehicleState=vehicleState;
+	this->macroPathGPS=NULL;
+
+	this->hashTable=new HashTable();
+	this->minHeap=new MinHeap();
+	this->microPathGPS =NULL;
+}
+
+PathPlanning::~PathPlanning() {
+	delete hashTable;
+	delete minHeap;
+	//delete intraGPSpath;
+}
+
+void PathPlanning::generatePath(float targetX, float targetY, ObstaclePoint* obstacleSquaresOnDevice, int nrOfObstacles, float minDistanceToObstacle, float obstacleMatrixResolution) {
+	/* This function generates a path from {0,0} to targetX,targetY using a variant of A* tailored for producing vehicle paths
+	 *
+	 */
+	hashTable->clearHashTable();
+	minHeap->clearMinHeap();
+
+	aStarNode *baseNode = hashTable->addAstarNode(0,0), *targetNode = hashTable->addAstarNode(targetX,targetY);
+	while (true) {
+		baseNode->isOnClosedSet=true;
+		baseNode->isOnOpenSet=false;
+
+		if (baseNode->x == targetNode->x && baseNode->y == targetNode->y) {return;} // Fix later
+
+		for (int i=0;i<14;i++) {discoverNeighbor(baseNode,targetNode,i,obstacleSquaresOnDevice,nrOfObstacles,minDistanceToObstacle,obstacleMatrixResolution);}
+		baseNode = minHeap->popNode();
+	}
+}
+
+void PathPlanning::setMacroPath(const char* pathName) {
+
+}
+
+void PathPlanning::discoverNeighbor(aStarNode* baseNode, aStarNode* targetNode, int index, ObstaclePoint* obstacleSquaresOnDevice, int nrOfObstacles, float minDistanceToObstacle, float obstacleMatrixResolution) {
+	// This function discovers a neighbor node to baseNode, looking in 8 directions forward, and 8 directions backward
+	aStarNode* neighborNode;
+
+	const float stepDistance=obstacleMatrixResolution; // The stepping distance between each point in the path
+	double deltaAngle,directionAngle;
+	switch(index) {
+		// Going forward:
+		case 0: {deltaAngle=0+(baseNode->pathIsReversingFromPrevNode ? M_PI : 0);break;}
+		case 1: {deltaAngle=0.1+(baseNode->pathIsReversingFromPrevNode ? M_PI : 0);break;}
+		case 2: {deltaAngle=0.2+(baseNode->pathIsReversingFromPrevNode ? M_PI : 0);break;}
+		case 3: {deltaAngle=0.4+(baseNode->pathIsReversingFromPrevNode ? M_PI : 0);break;}
+		case 4: {deltaAngle=-0.1+(baseNode->pathIsReversingFromPrevNode ? M_PI : 0);break;}
+		case 5: {deltaAngle=-0.2+(baseNode->pathIsReversingFromPrevNode ? M_PI : 0);break;}
+		case 6: {deltaAngle=-0.4+(baseNode->pathIsReversingFromPrevNode ? M_PI : 0);break;}
+		// Reversing:
+		case 7: {deltaAngle=0+(baseNode->pathIsReversingFromPrevNode ? 0 : M_PI);break;}
+		case 8: {deltaAngle=0.1+(baseNode->pathIsReversingFromPrevNode ? 0 : M_PI);break;}
+		case 9: {deltaAngle=0.2+(baseNode->pathIsReversingFromPrevNode ? 0 : M_PI);break;}
+		case 10: {deltaAngle=0.4+(baseNode->pathIsReversingFromPrevNode ? 0 : M_PI);break;}
+		case 11: {deltaAngle=-0.1+(baseNode->pathIsReversingFromPrevNode ? 0 : M_PI);break;}
+		case 12: {deltaAngle=-0.2+(baseNode->pathIsReversingFromPrevNode ? 0 : M_PI);break;}
+		case 13: {deltaAngle=-0.4+(baseNode->pathIsReversingFromPrevNode ? 0 : M_PI);break;}
+	}
+	directionAngle = baseNode->angleFromPreviosNodeInPath + deltaAngle;
+	if (directionAngle < -M_PI) {directionAngle+=2*M_PI;}
+	if (directionAngle > M_PI) {directionAngle-=2*M_PI;}
+
+	// The coordinates of the neighbor node, the values rounded to match the obstacleMatrixResolution in the grid:
+	float neighborX,neighborY;
+	neighborX = baseNode->x + round(stepDistance * cos(directionAngle)/obstacleMatrixResolution)*obstacleMatrixResolution;
+	neighborY = baseNode->y + round(stepDistance * sin(directionAngle)/obstacleMatrixResolution)*obstacleMatrixResolution;
+
+	neighborNode = hashTable->addAstarNode(neighborX,neighborY); // Gets the neighborNode from the hashTable, or adds it if it hasn't been visited
+
+	if (!neighborNode->isOnOpenSet && !neighborNode->isOnClosedSet) {
+		// If this is true, the node has not been discovered yet, so before doing anything else, check if the node is too
+		// close to any obstacle, and if so mark it as closed
+		neighborNode->isOnClosedSet = checkIfNodesAreToCloseToObstacles(neighborNode,1,obstacleSquaresOnDevice,nrOfObstacles,minDistanceToObstacle,obstacleMatrixResolution);
+	}
+	if (neighborNode->isOnClosedSet) {return;}	// neighborNode is either on closed set, or to close to an obstacle, so ignore it
+
+	// Calculate the new distance from start node and heuristics:
+	float neighborDistanceFromStartNode;
+	neighborDistanceFromStartNode = sqrt((baseNode->x-neighborNode->x)*(baseNode->x-neighborNode->x)+(baseNode->y-neighborNode->y)*(baseNode->y-neighborNode->y));
+	if (index>6) {neighborDistanceFromStartNode *= 1.3;} //Increase the distance if the vehicle is reversing (punish reversing). A lot of modifications can be done here
+	neighborDistanceFromStartNode += baseNode->distanceFromStartNode;
+
+	float neighbourHeuristic;
+	neighbourHeuristic = neighborDistanceFromStartNode;
+	neighbourHeuristic += sqrt((neighborNode->x-targetNode->x)*(neighborNode->x-targetNode->x)+(neighborNode->y-targetNode->y)*(neighborNode->y-targetNode->y));
+
+	if (!neighborNode->isOnOpenSet) {
+		// Node has not been discovered yet
+		neighborNode->isOnOpenSet=true;
+		neighborNode->distanceFromStartNode =neighborDistanceFromStartNode;
+		neighborNode->heuristic = neighbourHeuristic;
+		neighborNode->angleFromPreviosNodeInPath = directionAngle;
+		neighborNode->previousNodeInPath = baseNode;
+		if (index<7) {neighborNode->pathIsReversingFromPrevNode=false;}
+		else {neighborNode->pathIsReversingFromPrevNode=true;}
+
+		minHeap->addNode(neighborNode);
+	}
+	else if (neighbourHeuristic < neighborNode->heuristic) {
+		neighborNode->distanceFromStartNode = neighborDistanceFromStartNode;
+		neighborNode->heuristic = neighbourHeuristic;
+		neighborNode->angleFromPreviosNodeInPath = directionAngle;
+		neighborNode->previousNodeInPath = baseNode;
+		if (index<7) {neighborNode->pathIsReversingFromPrevNode=false;}
+		else {neighborNode->pathIsReversingFromPrevNode=true;}
+
+		minHeap->bubbleNode(neighborNode);
+	}
+}
+
+
+
+void PathPlanning::updatePathAndControlSignals(ObstaclePoint* obstacleSquares,int nrOfObstacles) {
+	/* This function does the following:
+	 *
+	 * -Updates the pathInLocalCoords based on the new vehicle GPS position
+	 * -Checks if the vehicle has passed the second GPS point in the path, and if then trims the path
+	 * -Checks if any new obstacles are detected along the path, and if then replans the path
+	 * -Sends the new control signals onto the CAN bus
+	 */
+
+	int nrOfPointsInPath=4;
+
+	// Update pathInLocalCoords based on the new GPS data
+	for (int i=0;i<nrOfPointsInPath;i++) {
+		/* First calculate the difference (in meters) between vehicleState->currentGPSPosition and getGPSpointInPath(i) in
+		 * lat and long. Call delta_lat y and delta_long x in a local coordinate system. Then remember that the heading of a
+		 * vehicle is defined as the angle from true north to the longitudinal centerline of the vehicle. The task is now
+		 * to rotate the point (x,y) clockwise by some angle so that the local x-axis now point in the same direction as the
+		 * vehicle longitudinal centerline. This angle is vehicleState->currentHeading-M_PI/2. To understand why M_PI/2 is subtracted
+		 * remember that a heading of 0 means the vehicle is traveling north. The local y axis will then align with the vehicle
+		 * longitudinal centerline. We want the x axis to align, and that is why we have to rotate the point with -M_PI/2 clockwise
+		 * The path will later be displayed overlaying the lidar data, so it is important that vehicleState->currentGPSposition
+		 * gives the exact location of the lidar sensor origin (x=0,y=0,z=0).
+		 */
+
+		//(pathInLocalCoords + i)->x = rotateAndGetX(getLongDistanceBetweenPoints(vehicleState->currentGPSposition,getGPSpointInPath(i)),getLatDistanceBetweenPoints(vehicleState->currentGPSposition,getGPSpointInPath(i)),-(vehicleState->currentHeading-M_PI/2));
+		//(pathInLocalCoords + i)->y = rotateAndGetY(getLongDistanceBetweenPoints(vehicleState->currentGPSposition,getGPSpointInPath(i)),getLatDistanceBetweenPoints(vehicleState->currentGPSposition,getGPSpointInPath(i)),-(vehicleState->currentHeading-M_PI/2));
+	}
+
+
+
+
+//	double currentPathAngle = getAngleBetweenPoints(getFirstPointInPath(),getSecondPointInPath());
+//	float
+//
+//	if () {
+//		currentPathIndex++;
+//		if (currentPathIndex==pointsInPath) {currentPathIndex=0;}
+//	}
+}
 
 // Hashtable:
+PathPlanning::HashTable::HashTable() {
+}
+
+PathPlanning::HashTable::~HashTable() {
+	clearHashTable();
+}
+
 int PathPlanning::HashTable::getIndex(float x, float y) {
 	// I tested this hasher in matlab, it is based on Java's hashCode(), and it gives pretty even results with obstacle matrix resolution
 	// between 0.01 and 0.2
@@ -30,14 +195,8 @@ aStarNode* PathPlanning::HashTable::getAstarNode(float x, float y) {
 	return NULL;
 }
 
-PathPlanning::HashTable::HashTable() {
-}
-
-PathPlanning::HashTable::~HashTable() {
-	clearHashTable();
-}
-
 void PathPlanning::HashTable::clearBucketList(HashBucket* bucket) {
+	// Deletes every entry in the bucket linked-list
 	if (bucket==NULL) {return;}
 
 	clearBucketList(bucket->nextBucket);
@@ -148,164 +307,9 @@ aStarNode* PathPlanning::MinHeap::popNode() {
 	return returnNode;
 }
 
-// PathPlanning:
-void PathPlanning::generatePath(float targetX, float targetY, OpenGLvertex* obstacleSquaresOnDevice, int nrOfObstacles, float minDistanceToObstacle, float obstacleMatrixResolution) {
-	/* This function generates a path from {0,0} to targetX,targetY using a variant of A* tailored for producing vehicle paths
-	 *
-	 */
-	hashTable->clearHashTable();
-	minHeap->clearMinHeap();
-
-	aStarNode *baseNode = hashTable->addAstarNode(0,0), *targetNode = hashTable->addAstarNode(targetX,targetY);
-	while (true) {
-		baseNode->isOnClosedSet=true;
-		baseNode->isOnOpenSet=false;
-
-		if (baseNode->x == targetNode->x && baseNode->y == targetNode->y) {return;} // Fix later
-
-		for (int i=0;i<14;i++) {discoverNeighbor(baseNode,targetNode,i,obstacleSquaresOnDevice,nrOfObstacles,minDistanceToObstacle,obstacleMatrixResolution);}
-		baseNode = minHeap->popNode();
-	}
-}
-
-void PathPlanning::discoverNeighbor(aStarNode* baseNode, aStarNode* targetNode, int index, OpenGLvertex* obstacleSquaresOnDevice, int nrOfObstacles, float minDistanceToObstacle, float obstacleMatrixResolution) {
-	// This function discovers a neighbor node to baseNode, looking in 8 directions forward, and 8 directions backward
-	aStarNode* neighborNode;
-
-	const float stepDistance=obstacleMatrixResolution; // The stepping distance between each point in the path
-	double deltaAngle,directionAngle;
-	switch(index) {
-		// Going forward:
-		case 0: {deltaAngle=0+(baseNode->pathIsReversingFromPrevNode ? M_PI : 0);break;}
-		case 1: {deltaAngle=0.1+(baseNode->pathIsReversingFromPrevNode ? M_PI : 0);break;}
-		case 2: {deltaAngle=0.2+(baseNode->pathIsReversingFromPrevNode ? M_PI : 0);break;}
-		case 3: {deltaAngle=0.4+(baseNode->pathIsReversingFromPrevNode ? M_PI : 0);break;}
-		case 4: {deltaAngle=-0.1+(baseNode->pathIsReversingFromPrevNode ? M_PI : 0);break;}
-		case 5: {deltaAngle=-0.2+(baseNode->pathIsReversingFromPrevNode ? M_PI : 0);break;}
-		case 6: {deltaAngle=-0.4+(baseNode->pathIsReversingFromPrevNode ? M_PI : 0);break;}
-		// Reversing:
-		case 7: {deltaAngle=0+(baseNode->pathIsReversingFromPrevNode ? 0 : M_PI);break;}
-		case 8: {deltaAngle=0.1+(baseNode->pathIsReversingFromPrevNode ? 0 : M_PI);break;}
-		case 9: {deltaAngle=0.2+(baseNode->pathIsReversingFromPrevNode ? 0 : M_PI);break;}
-		case 10: {deltaAngle=0.4+(baseNode->pathIsReversingFromPrevNode ? 0 : M_PI);break;}
-		case 11: {deltaAngle=-0.1+(baseNode->pathIsReversingFromPrevNode ? 0 : M_PI);break;}
-		case 12: {deltaAngle=-0.2+(baseNode->pathIsReversingFromPrevNode ? 0 : M_PI);break;}
-		case 13: {deltaAngle=-0.4+(baseNode->pathIsReversingFromPrevNode ? 0 : M_PI);break;}
-	}
-	directionAngle = baseNode->angleFromPreviosNodeInPath + deltaAngle;
-	if (directionAngle < -M_PI) {directionAngle+=2*M_PI;}
-	if (directionAngle > M_PI) {directionAngle-=2*M_PI;}
-
-	// The coordinates of the neighbor node, the values rounded to match the obstacleMatrixResolution in the grid:
-	float neighborX,neighborY;
-	neighborX = baseNode->x + round(stepDistance * cos(directionAngle)/obstacleMatrixResolution)*obstacleMatrixResolution;
-	neighborY = baseNode->y + round(stepDistance * sin(directionAngle)/obstacleMatrixResolution)*obstacleMatrixResolution;
-
-	neighborNode = hashTable->addAstarNode(neighborX,neighborY); // Gets the neighborNode from the hashTable, or adds it if it hasn't been visited
-
-	if (!neighborNode->isOnOpenSet && !neighborNode->isOnClosedSet) {
-		// If this is true, the node has not been discovered yet, so before doing anything else, check if the node is too
-		// close to any obstacle, and if so mark it as closed
-		neighborNode->isOnClosedSet = checkIfNodesAreToCloseToObstacles(neighborNode,1,obstacleSquaresOnDevice,nrOfObstacles,minDistanceToObstacle,obstacleMatrixResolution);
-	}
-	if (neighborNode->isOnClosedSet) {return;}	// neighborNode is either on closed set, or to close to an obstacle, so ignore it
-
-	// Calculate the new distance from start node and heuristics:
-	float neighborDistanceFromStartNode;
-	neighborDistanceFromStartNode = sqrt((baseNode->x-neighborNode->x)*(baseNode->x-neighborNode->x)+(baseNode->y-neighborNode->y)*(baseNode->y-neighborNode->y));
-	if (index>6) {neighborDistanceFromStartNode *= 1.3;} //Increase the distance if the vehicle is reversing (punish reversing). A lot of modifications can be done here
-	neighborDistanceFromStartNode += baseNode->distanceFromStartNode;
-
-	float neighbourHeuristic;
-	neighbourHeuristic = neighborDistanceFromStartNode;
-	neighbourHeuristic += sqrt((neighborNode->x-targetNode->x)*(neighborNode->x-targetNode->x)+(neighborNode->y-targetNode->y)*(neighborNode->y-targetNode->y));
-
-	if (!neighborNode->isOnOpenSet) {
-		// Node has not been discovered yet
-		neighborNode->isOnOpenSet=true;
-		neighborNode->distanceFromStartNode =neighborDistanceFromStartNode;
-		neighborNode->heuristic = neighbourHeuristic;
-		neighborNode->angleFromPreviosNodeInPath = directionAngle;
-		neighborNode->previousNodeInPath = baseNode;
-		if (index<7) {neighborNode->pathIsReversingFromPrevNode=false;}
-		else {neighborNode->pathIsReversingFromPrevNode=true;}
-
-		minHeap->addNode(neighborNode);
-	}
-	else if (neighbourHeuristic < neighborNode->heuristic) {
-		neighborNode->distanceFromStartNode = neighborDistanceFromStartNode;
-		neighborNode->heuristic = neighbourHeuristic;
-		neighborNode->angleFromPreviosNodeInPath = directionAngle;
-		neighborNode->previousNodeInPath = baseNode;
-		if (index<7) {neighborNode->pathIsReversingFromPrevNode=false;}
-		else {neighborNode->pathIsReversingFromPrevNode=true;}
-
-		minHeap->bubbleNode(neighborNode);
-	}
-}
-
-
-PathPlanning::PathPlanning(VehicleState* vehicleState, Path* mainGPSpath) {
-	this->vehicleState=vehicleState;
-	this->mainGPSpath=mainGPSpath;
-
-	this->hashTable = new HashTable();
-	this->minHeap = new MinHeap();
-	this->intraGPSpath = new Path();
-}
-
-PathPlanning::~PathPlanning() {
-	delete hashTable;
-	delete minHeap;
-	delete intraGPSpath;
-}
-
-
-void PathPlanning::updatePathAndControlSignals(OpenGLvertex* obstacleSquares,int nrOfObstacles) {
-	/* This function does the following:
-	 *
-	 * -Updates the pathInLocalCoords based on the new vehicle GPS position
-	 * -Checks if the vehicle has passed the second GPS point in the path, and if then trims the path
-	 * -Checks if any new obstacles are detected along the path, and if then replans the path
-	 * -Sends the new control signals onto the CAN bus
-	 */
-
-	int nrOfPointsInPath=4;
-
-	// Update pathInLocalCoords based on the new GPS data
-	for (int i=0;i<nrOfPointsInPath;i++) {
-		/* First calculate the difference (in meters) between vehicleState->currentGPSPosition and getGPSpointInPath(i) in
-		 * lat and long. Call delta_lat y and delta_long x in a local coordinate system. Then remember that the heading of a
-		 * vehicle is defined as the angle from true north to the longitudinal centerline of the vehicle. The task is now
-		 * to rotate the point (x,y) clockwise by some angle so that the local x-axis now point in the same direction as the
-		 * vehicle longitudinal centerline. This angle is vehicleState->currentHeading-M_PI/2. To understand why M_PI/2 is subtracted
-		 * remember that a heading of 0 means the vehicle is traveling north. The local y axis will then align with the vehicle
-		 * longitudinal centerline. We want the x axis to align, and that is why we have to rotate the point with -M_PI/2 clockwise
-		 * The path will later be displayed overlaying the lidar data, so it is important that vehicleState->currentGPSposition
-		 * gives the exact location of the lidar sensor origin (x=0,y=0,z=0).
-		 */
-
-		//(pathInLocalCoords + i)->x = rotateAndGetX(getLongDistanceBetweenPoints(vehicleState->currentGPSposition,getGPSpointInPath(i)),getLatDistanceBetweenPoints(vehicleState->currentGPSposition,getGPSpointInPath(i)),-(vehicleState->currentHeading-M_PI/2));
-		//(pathInLocalCoords + i)->y = rotateAndGetY(getLongDistanceBetweenPoints(vehicleState->currentGPSposition,getGPSpointInPath(i)),getLatDistanceBetweenPoints(vehicleState->currentGPSposition,getGPSpointInPath(i)),-(vehicleState->currentHeading-M_PI/2));
-	}
-
-
-
-
-//	double currentPathAngle = getAngleBetweenPoints(getFirstPointInPath(),getSecondPointInPath());
-//	float
-//
-//	if () {
-//		currentPathIndex++;
-//		if (currentPathIndex==pointsInPath) {currentPathIndex=0;}
-//	}
-}
-
-
-
 
 // Non member functions:
-__global__ void checkIfNodeIsToCloseToObstacle(aStarNode* nodesOnDevice, int nrOfNodes, OpenGLvertex* obstacleSquaresOnDevice, int nrOfObstacles, float minDistanceToObstacle, float obstacleMatrixResolution, bool* isToClosePointer) {
+__global__ void checkIfNodeIsToCloseToObstacle(aStarNode* nodesOnDevice, int nrOfNodes, ObstaclePoint* obstacleSquaresOnDevice, int nrOfObstacles, float minDistanceToObstacle, float obstacleMatrixResolution, bool* isToClosePointer) {
 	/* Think of the function as a matrix, where nodes are the rows, and obstacles are the columns. For each node/obstacle pair, see if
 	 * their distance is at least the min distance. To get the row and column index, row = index/columnSize, column = index - row*columnSize
 	 */
@@ -325,7 +329,7 @@ __global__ void checkIfNodeIsToCloseToObstacle(aStarNode* nodesOnDevice, int nrO
 	}
 }
 
-bool checkIfNodesAreToCloseToObstacles(aStarNode* nodes, int nrOfNodes, OpenGLvertex* obstacleSquaresOnDevice, int nrOfObstacles, float minDistanceToObstacle, float obstacleMatrixResolution) {
+bool checkIfNodesAreToCloseToObstacles(aStarNode* nodes, int nrOfNodes, ObstaclePoint* obstacleSquaresOnDevice, int nrOfObstacles, float minDistanceToObstacle, float obstacleMatrixResolution) {
 	// Returns false if all nodes in nodes have a min distance of minDistance to all obstacles in obstacleSquaresOnDevice, otherwise returns true
 	bool* isToClosePointer;
 	CUDA_CHECK_RETURN(cudaMalloc((void**)&isToClosePointer,sizeof(bool)));
@@ -362,17 +366,18 @@ float rotateAndGetY(float x, float y, double angle) {
 	return x * sin(angle) + y * cos(angle);
 }
 
-float getLongDistanceBetweenPoints(GPSpoint* fromPoint, GPSpoint* toPoint) {
+float getLongDistanceBetweenPoints(GPSposition* fromPoint, GPSposition* toPoint) {
 	// Returns the longitudinal distance in meters from fromPoint to toPoint
 	int lengthOfDegreeLongInMeters = 57141;
 	return lengthOfDegreeLongInMeters*(toPoint->longc - fromPoint->longc);
 }
 
-float getLatDistanceBetweenPoints(GPSpoint* fromPoint, GPSpoint* toPoint) {
+float getLatDistanceBetweenPoints(GPSposition* fromPoint, GPSposition* toPoint) {
 	// Returns the latitudinal distance in meters from fromPoint to toPoint
 	int lengthOfDegreeLatInMeters = 111398;
 	return lengthOfDegreeLatInMeters*(toPoint->latc - fromPoint->latc);
 }
+
 
 //GPSpoint* PathPlanning::getGPSpointInPath(int index) {
 //	int arrayIndex = index + currentPathIndex;
@@ -407,3 +412,5 @@ float getLatDistanceBetweenPoints(GPSpoint* fromPoint, GPSpoint* toPoint) {
 //	clearNeighborsList(listEntry->nextListEntry);
 //	delete listEntry;
 //}
+
+

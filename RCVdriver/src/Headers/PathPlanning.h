@@ -1,7 +1,7 @@
 #ifndef PATHPLANNING_H_
 #define PATHPLANNING_H_
 
-#include "StructDefinitions.h"
+#include "Structs.h"
 
 #define HEAP_SIZE 5000 // The heap has limited space
 #define HASH_TABLE_ENTRIES 5000 // The hash table has unlimited space, but a limited number of possible hashes
@@ -55,23 +55,24 @@ class PathPlanning {
 
 	// External vars
 	VehicleState* vehicleState; // Current vehicle state
-	Path* mainGPSpath; // The main GPS path (start to goal) as a linked list
+	GPSposition* macroPathGPS; // The main GPS path (start to goal) as a linked list
 
 	// Internal vars
 	HashTable* hashTable;
 	MinHeap* minHeap;
-	Path* intraGPSpath; // The path to the next point in the mainGPSpath as a linked list
+	GPSposition* microPathGPS; // The path to the next point in the mainGPSpath as a linked list
 
 	// Functions
-	void discoverNeighbor(aStarNode* baseNode, aStarNode* targetNode, int index, OpenGLvertex* obstacleSquaresOnDevice, int nrOfObstacles, float minDistanceToObstacle, float obstacleMatrixResolution);
-	void generatePath(float targetX, float targetY, OpenGLvertex* obstacleSquaresOnDevice, int nrOfObstacles, float minDistanceToObstacle, float obstacleMatrixResolution);
+	void discoverNeighbor(aStarNode* baseNode, aStarNode* targetNode, int index, ObstaclePoint* obstacleSquaresOnDevice, int nrOfObstacles, float minDistanceToObstacle, float obstacleMatrixResolution);
+	void generatePath(float targetX, float targetY, ObstaclePoint* obstacleSquaresOnDevice, int nrOfObstacles, float minDistanceToObstacle, float obstacleMatrixResolution);
 	void buildPath(); // TODO implement
 
 	public:
-		PathPlanning(VehicleState* vehicleState, Path* mainGPSpath);
+		PathPlanning(VehicleState* vehicleState);
 		~PathPlanning();
 
-		void updatePathAndControlSignals(OpenGLvertex* obstacleSquares, int nrOfObstacles);
+		void updatePathAndControlSignals(ObstaclePoint* obstacleSquares, int nrOfObstacles);
+		void setMacroPath(const char* pathName);
 };
 
 #endif /* PATHPLANNING_H_ */
