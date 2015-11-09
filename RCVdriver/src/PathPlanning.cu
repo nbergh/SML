@@ -46,6 +46,15 @@ void PathPlanning::generatePath(float targetX, float targetY, ObstaclePoint* obs
 }
 
 void PathPlanning::setMacroPath(const char* pathName) {
+//	FILE *fp = fopen(pathName,'rt');
+//	if (fp  == NULL); {
+//		printf("%s%s\n","Unable to open path file: ", strerror(errno));
+//		return;
+//	}
+//
+//	int nrOfCoordinates=0;
+//	fscanf (file, "%d", &nrOfCoordinates);
+
 
 }
 

@@ -134,7 +134,7 @@ src/RCVdriver.o : ../src/RCVdriver.cu \
     /usr/include/stdint.h \
     /usr/include/x86_64-linux-gnu/bits/wchar.h \
     /usr/include/x86_64-linux-gnu/bits/in.h \
-    ../src/Headers/GPSprocessing.h \
+    ../src/Headers/PositionEstimation.h \
     ../src/Headers/Structs.h \
     ../src/Headers/PathPlanning.h \
     ../src/Headers/Input.h \

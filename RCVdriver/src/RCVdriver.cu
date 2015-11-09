@@ -8,7 +8,7 @@
  */
 
 #include "LidarProcessing/Headers/LidarProcessing.h"
-#include "Headers/GPSprocessing.h"
+#include "Headers/PositionEstimation.h"
 #include "Headers/PathPlanning.h"
 #include "Headers/Input.h"
 #include "Headers/Graphics.h"
@@ -17,7 +17,7 @@
 #define GRAPHICS_UPDATE_RATE 60 //Hz
 
 LidarProcessing* lidarProcessing;
-GPSprocessing* gpsProcessing;
+PositionEstimation* positionEstimation;
 PathPlanning* pathPlanning;
 Input* input;
 
@@ -36,7 +36,7 @@ int main(void)
 	//lidarProcessing = new LidarProcessing();
 	//gpsProcessing = new GPSprocessing();
 	pathPlanning = new PathPlanning(NULL);//Temp
-	input = new Input();
+	//input = new Input(pathPlanning->setMacroPath);
 
 	// Set the controllerMainLoopStep to execute periodically:
 
@@ -45,7 +45,7 @@ int main(void)
 	//startGraphics(lidarProcessing->getLidarDataPoints(),lidarProcessing->getObstacleSquares(),lidarProcessing->getCurrentNrOfObstacles(),GRAPHICS_UPDATE_RATE);
 
 	delete lidarProcessing;
-	delete gpsProcessing;
+	delete positionEstimation;
 	delete pathPlanning;
 	delete input;
 }

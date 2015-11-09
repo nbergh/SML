@@ -4,9 +4,9 @@
 
 # Add inputs and outputs from these tool invocations to the build variables 
 CPP_SRCS += \
-../src/GPSprocessing.cpp \
 ../src/Graphics.cpp \
-../src/Input.cpp 
+../src/Input.cpp \
+../src/PositionEstimation.cpp 
 
 CU_SRCS += \
 ../src/CudaErrorCheckFunctions.cu \
@@ -20,16 +20,16 @@ CU_DEPS += \
 
 OBJS += \
 ./src/CudaErrorCheckFunctions.o \
-./src/GPSprocessing.o \
 ./src/Graphics.o \
 ./src/Input.o \
 ./src/PathPlanning.o \
+./src/PositionEstimation.o \
 ./src/RCVdriver.o 
 
 CPP_DEPS += \
-./src/GPSprocessing.d \
 ./src/Graphics.d \
-./src/Input.d 
+./src/Input.d \
+./src/PositionEstimation.d 
 
 
 # Each subdirectory must supply rules for building sources it contributes
