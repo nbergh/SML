@@ -1,16 +1,16 @@
 #ifndef POSITIONESTIMATION_H_
 #define POSITIONESTIMATION_H_
 
-#include "Structs.h"
+#include "../../Headers/Structs.h"
 
 class PositionEstimation {
 
+	VehicleState* vehicleState; // The state of the vehicle
 
 public:
 	PositionEstimation();
 	~PositionEstimation();
-	GPSposition *getCurrentVehiclePosition();
-
+	const VehicleState& getCurrentVehicleState();
 };
 
 

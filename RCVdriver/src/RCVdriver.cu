@@ -8,13 +8,12 @@
  */
 
 #include "LidarProcessing/Headers/LidarProcessing.h"
-#include "Headers/PositionEstimation.h"
+#include "PositionEstimation/Headers/PositionEstimation.h"
 #include "Headers/PathPlanning.h"
 #include "Headers/Input.h"
 #include "Headers/Graphics.h"
 
 #define CONTROLLER_UPDATE_RATE 10 //Hz
-#define GRAPHICS_UPDATE_RATE 60 //Hz
 
 LidarProcessing* lidarProcessing;
 PositionEstimation* positionEstimation;
@@ -23,20 +22,21 @@ Input* input;
 
 void controllerMainLoopStep() {
 	// This function defines everything the RCV should in each iteration in the main controller loop
-
 	lidarProcessing->processLidarData(); // Process the lidar data from the sensors
+	pathPlanning->updatePathAndControlSignals();
 	// Update the path
 	// Send the control signals
 }
 
 #include <unistd.h> // temp
+#include <stdio.h>
 int main(void)
 {
-	// First initialize the
-	//lidarProcessing = new LidarProcessing();
-	//gpsProcessing = new GPSprocessing();
-	pathPlanning = new PathPlanning(NULL);//Temp
-	//input = new Input(pathPlanning->setMacroPath);
+	// First initialize the main classes:
+	lidarProcessing = new LidarProcessing();
+	positionEstimation = new PositionEstimation();
+	pathPlanning = new PathPlanning(positionEstimation->getCurrentVehicleState(),lidarProcessing->getObstacleSquares(),lidarProcessing->getCurrentNrOfObstacles());
+	input = new Input(*pathPlanning);
 
 	// Set the controllerMainLoopStep to execute periodically:
 
@@ -44,9 +44,9 @@ int main(void)
 
 	//startGraphics(lidarProcessing->getLidarDataPoints(),lidarProcessing->getObstacleSquares(),lidarProcessing->getCurrentNrOfObstacles(),GRAPHICS_UPDATE_RATE);
 
-	delete lidarProcessing;
-	delete positionEstimation;
-	delete pathPlanning;
 	delete input;
+	delete pathPlanning;
+	delete positionEstimation;
+	delete lidarProcessing;
 }
 

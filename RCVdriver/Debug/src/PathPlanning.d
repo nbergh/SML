@@ -114,4 +114,9 @@ src/PathPlanning.o : ../src/PathPlanning.cu \
     ../src/Headers/PathPlanning.h \
     ../src/Headers/Structs.h \
     ../src/Headers/CudaErrorCheckFunctions.h \
-    /usr/include/x86_64-linux-gnu/sys/time.h
+    /usr/include/errno.h \
+    /usr/include/x86_64-linux-gnu/bits/errno.h \
+    /usr/include/linux/errno.h \
+    /usr/include/x86_64-linux-gnu/asm/errno.h \
+    /usr/include/asm-generic/errno.h \
+    /usr/include/asm-generic/errno-base.h

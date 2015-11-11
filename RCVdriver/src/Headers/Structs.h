@@ -10,14 +10,19 @@ struct LidarDataPoint {
 struct ObstaclePoint {
 	float x,y;
 };
+struct PathPoint {
+	float x,y;
+	char r,b,g; // Colors of the point
+};
 struct GPSposition {
-	// GPS position, always in decimal degrees
-	float latc, longc;
+	// GPS position, always in decimal degrees, latc degrees NORTH, longc degrees EAST
+	double latc, longc;
 };
 struct VehicleState {
 	// The position of the vehicle
 	GPSposition currentPosition;
-	double heading;
+	double currentHeading;
+	bool isRunning; // If this is false, no data will go on to the CAN bus
 };
 
 

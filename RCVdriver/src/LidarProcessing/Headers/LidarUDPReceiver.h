@@ -6,7 +6,7 @@
 #include <arpa/inet.h>
 
 class LidarUDPReceiver {
-	char *tempPacketBuffer, *rawLidarData;
+	char *rawLidarData, tempPacketBuffer[1206];
 	bool stopReceiverThread; // Flag for exiting the thread
 	pthread_t receiverThreadID;
 
@@ -15,16 +15,14 @@ class LidarUDPReceiver {
 	struct sockaddr_in socketAddressMe, socketAddressOther; // Socket addresses
 	socklen_t socketLength;
 
-	static void* threadEntryFunction(void* thisPointer); // A static function that is required for pthread_create
+	void startReceiverThread();
 	void tryToReceiveLidarPacket();
-	bool isLidarPacket(char* packet);
-
-	void receiverThreadFunction(); // Thread function
+	bool isLidarPacket(const char* packet);
+	friend void* receiverThreadFunction(void *arg); // Thread function
 
 public:
-	LidarUDPReceiver(int udpPort);
+	LidarUDPReceiver(const int udpPort, char* rawLidarData);
 	~LidarUDPReceiver();
-	void startReceiverThread(char* rawLidarData);
 };
 
 #endif

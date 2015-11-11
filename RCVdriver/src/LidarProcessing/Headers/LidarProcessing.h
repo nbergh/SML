@@ -23,16 +23,16 @@ class LidarProcessing {
 	LidarUDPReceiver* lidarUDPReceiver;
 	int currentNrOfObstacles;
 
-	void allocateMemory();
-	void freeMemory();
+	void allocateMemory() const;
+	void freeMemory() const;
 
 	public:
 		LidarProcessing();
 		~LidarProcessing();
 		void processLidarData();
-		LidarDataPoint* getLidarDataPoints();
-		ObstaclePoint* getObstacleSquares();
-		int* getCurrentNrOfObstacles();
+		const LidarDataPoint* getLidarDataPoints() const;
+		const ObstaclePoint* getObstacleSquares() const;
+		const int& getCurrentNrOfObstacles() const;
 };
 
 

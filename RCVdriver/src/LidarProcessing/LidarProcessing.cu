@@ -2,7 +2,6 @@
 #include "Headers/LidarCudaFunctions.h"
 #include "../Headers/CudaErrorCheckFunctions.h"
 
-
 #define LIDAR_UDP_PORT 2368 // The port that receives lidar data
 #define MAX_OBSTACLE_DETECTION_DISTANCE 20 // The maximal distance (in meters) that an obstacle can be identified in
 #define OBSTACLE_POINT_SIDE_LENGTH 0.05 // The length of one side in the square that represents an obstacle point (decreasing this value by a factor of X will require X² times more device memory)
@@ -11,13 +10,12 @@
 
 LidarProcessing::LidarProcessing() {
 	// First allocate all data needed by this class:
-	currentNrOfObstacles=0;
 	lidarMemoryPointers = new LidarMemoryPointers();
+	currentNrOfObstacles=0;
 	allocateMemory();
 
 	// Then initialize the UDP socket, test the connection, and start the UDP receiver thread:
-	lidarUDPReceiver = new LidarUDPReceiver(LIDAR_UDP_PORT);
-	lidarUDPReceiver->startReceiverThread(lidarMemoryPointers->rawLidarData);
+	lidarUDPReceiver = new LidarUDPReceiver(LIDAR_UDP_PORT,lidarMemoryPointers->rawLidarData);
 }
 
 LidarProcessing::~LidarProcessing() {
@@ -26,7 +24,7 @@ LidarProcessing::~LidarProcessing() {
 	delete lidarMemoryPointers;
 }
 
-void LidarProcessing::allocateMemory() {
+void LidarProcessing::allocateMemory() const {
 	/* The size of the buffer array is 90000 bytes which is enough space for 75 packets (75*1200=90000).
 	 * The VLP-16 will send exactly 754 data packets per second, and if the lidar is spinning at 603.2 rpm,
 	 * that means one revolution will make up exactly 75 packets (754/(603.2/60) = 75). We want exactly one
@@ -59,7 +57,7 @@ void LidarProcessing::allocateMemory() {
 	CUDA_CHECK_RETURN(cudaMalloc((void**)&lidarMemoryPointers->obstacleMatrixForMinZOnGPU,lidarMemoryPointers->sizeOfObstacleMatrix));
 }
 
-void LidarProcessing::freeMemory() {
+void LidarProcessing::freeMemory() const {
 	CUDA_CHECK_RETURN(cudaFreeHost((void*)lidarMemoryPointers->rawLidarData));
 	CUDA_CHECK_RETURN(cudaFree(lidarMemoryPointers->rawLidarDataOnGPU));
 	CUDA_CHECK_RETURN(cudaFreeHost((void*)lidarMemoryPointers->lidarDataPoints));
@@ -71,18 +69,18 @@ void LidarProcessing::freeMemory() {
 }
 
 void LidarProcessing::processLidarData() {
-	translateLidarDataFromRawToXYZ(lidarMemoryPointers);
-	currentNrOfObstacles = identifyObstaclesInLidarData(lidarMemoryPointers,OBSTACLE_POINT_SIDE_LENGTH,MIN_OBSTACLE_DELTA_Z,MAX_NUMBER_OF_OBSTACLES);
+	translateLidarDataFromRawToXYZ(*lidarMemoryPointers);
+	currentNrOfObstacles = identifyObstaclesInLidarData(*lidarMemoryPointers,OBSTACLE_POINT_SIDE_LENGTH,MIN_OBSTACLE_DELTA_Z,MAX_NUMBER_OF_OBSTACLES);
 }
 
-LidarDataPoint* LidarProcessing::getLidarDataPoints() {
+const LidarDataPoint* LidarProcessing::getLidarDataPoints() const {
 	return lidarMemoryPointers->lidarDataPoints;
 }
 
-ObstaclePoint* LidarProcessing::getObstacleSquares() {
+const ObstaclePoint* LidarProcessing::getObstacleSquares() const {
 	return lidarMemoryPointers->obstacleSquares;
 }
 
-int* LidarProcessing::getCurrentNrOfObstacles() {
-	return &currentNrOfObstacles;
+const int &LidarProcessing::getCurrentNrOfObstacles() const {
+	return currentNrOfObstacles;
 }

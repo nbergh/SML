@@ -2,34 +2,108 @@
 #include "Headers/CudaErrorCheckFunctions.h"
 
 #include <stdlib.h>
+#include <stdio.h>
 #include <math.h>
-#include <string.h>
-#include <sys/time.h>
+#include <string.h> // For memset
+#include <errno.h>
 
-// Non-member function declarations
-bool checkIfNodesAreToCloseToObstacles(aStarNode* nodes, int nrOfNodes, ObstaclePoint* obstacleSquaresOnDevice, int nrOfObstacles, float minDistanceToObstacle, float obstacleMatrixResolution);
+#define LENGTH_OF_ONE_LONG_DEGREE_IN_METERS 57141
+#define LENGTH_OF_ONE_LAT_DEGREE_IN_METERS 111398
 
+namespace {
+	// Non-member function declarations
+	bool checkIfNodesAreToCloseToObstacles(const aStarNode* nodes, int nrOfNodes, const ObstaclePoint *obstacleSquaresOnGPU, int nrOfObstacles, float minDistanceToObstacle, float obstacleMatrixResolution);
+	float rotateAndGetX(float x, float y, double angle);
+	float rotateAndGetY(float x, float y, double angle);
+}
 
 // PathPlanning:
-PathPlanning::PathPlanning(VehicleState* vehicleState) {
-	this->vehicleState=vehicleState;
-	this->macroPathGPS=NULL;
+PathPlanning::PathPlanning(const VehicleState &vehicleState, const ObstaclePoint* obstacleSquaresOnGPU, const int &currentNrOfObstacles):
+		vehicleState(vehicleState),
+		obstacleSquaresOnGPU(obstacleSquaresOnGPU),
+		currentNrOfObstacles(currentNrOfObstacles) {
 
 	this->hashTable=new HashTable();
 	this->minHeap=new MinHeap();
-	this->microPathGPS =NULL;
+
+	this->macroPathGPS=NULL;
+	this->microPathGPS=NULL;
+	this->microPathXY=NULL;
+	this->lengthOfMacroPath=0;
+	this->lengthOfMicroPath=0;
+	this->currentIndexInMacroPath=0;
+	this->currentIndexInMicroPath=0;
 }
 
 PathPlanning::~PathPlanning() {
 	delete hashTable;
 	delete minHeap;
-	//delete intraGPSpath;
+	delete[] macroPathGPS;
+	delete[] microPathGPS;
+	delete[] microPathXY;
 }
 
-void PathPlanning::generatePath(float targetX, float targetY, ObstaclePoint* obstacleSquaresOnDevice, int nrOfObstacles, float minDistanceToObstacle, float obstacleMatrixResolution) {
+void PathPlanning::updatePathAndControlSignals() const {
+	// This is the main path-updating function that gets called once every iteration of the main control loop
+	if (currentIndexInMacroPath == lengthOfMacroPath-1 || lengthOfMacroPath==0) {return;} // Vehicle has arrived on target
+
+	// First translate the path from GPS coords to XY coords
+	for (int i=currentIndexInMicroPath;i<lengthOfMicroPath;i++) {
+		translateGPSpositionToXY(microPathGPS->latc,microPathGPS->longc,microPathXY[i]);
+	}
+
+	double currentPathAngle;
+	float pathPointRotatedY,vehicleRotatedY;
+	// The update currentIndexInMicroPath
+	while(true) {
+		//currentPathAngle=atan2(microPathXY[currentIndexInMicroPath].x
+	}
+}
+
+bool PathPlanning::setMacroPath(const char* filePath) {
+	// Clear old path first:
+	delete[] macroPathGPS;
+	currentIndexInMacroPath=0;
+	lengthOfMacroPath=0;
+
+	// This function is called by Input when a new path is loaded. The filepath to the pathfile is the parameter
+	FILE *fp;
+	char line[60];
+
+	if ((fp = fopen(filePath,"rt"))  == NULL) {
+		printf("%s%s\n","Unable to open path file: ", strerror(errno));
+		return false;
+	}
+
+	while (fgets(line, 60, fp)) {if (*line!=35) {break;}} // Comment line, starting with '#'
+	sscanf(line,"%d",&lengthOfMacroPath);
+
+	macroPathGPS = new GPSposition[lengthOfMacroPath]();
+
+	for (int i=0;i<lengthOfMacroPath;i++) {
+		if (fgets(line,60,fp)==0) {
+			printf("%s%s\n","Read error when reading from path file: ",strerror(errno));
+			delete[] macroPathGPS;
+			macroPathGPS=NULL;
+			return false;
+		}
+		sscanf(line,"%lf %lf\n",&((macroPathGPS+i)->latc),&((macroPathGPS+i)->longc));
+	}
+
+	fclose(fp);
+	return true;
+}
+
+bool PathPlanning::generateMicroPath(float targetX, float targetY, const ObstaclePoint* obstacleSquaresOnDevice, int nrOfObstacles, float minDistanceToObstacle, float obstacleMatrixResolution) {
 	/* This function generates a path from {0,0} to targetX,targetY using a variant of A* tailored for producing vehicle paths
-	 *
+	 * returns true if a path was found, and false otherwise
 	 */
+
+	// First delete the current microGPSpath:
+	delete[] microPathGPS;
+	delete[] microPathXY;
+	currentIndexInMicroPath=0;
+	lengthOfMicroPath=0;
 	hashTable->clearHashTable();
 	minHeap->clearMinHeap();
 
@@ -38,27 +112,34 @@ void PathPlanning::generatePath(float targetX, float targetY, ObstaclePoint* obs
 		baseNode->isOnClosedSet=true;
 		baseNode->isOnOpenSet=false;
 
-		if (baseNode->x == targetNode->x && baseNode->y == targetNode->y) {return;} // Fix later
+		if (baseNode->x == targetNode->x && baseNode->y == targetNode->y) {break;} // Path found
 
-		for (int i=0;i<14;i++) {discoverNeighbor(baseNode,targetNode,i,obstacleSquaresOnDevice,nrOfObstacles,minDistanceToObstacle,obstacleMatrixResolution);}
+		for (int i=0;i<14;i++) {
+			if(!discoverNeighbor(baseNode,targetNode,i,obstacleSquaresOnDevice,nrOfObstacles,minDistanceToObstacle,obstacleMatrixResolution)) {
+				return false; // Means that the minHeap is full, and cannot accept any more nodes
+			}
+		}
 		baseNode = minHeap->popNode();
+		if (baseNode==NULL) {return false;} // No path could be found
 	}
+
+	// Path found, now init microPathGPS
+	const aStarNode* currentNode = targetNode;
+	while((currentNode = currentNode->previousNodeInPath)!=NULL) {lengthOfMicroPath++;} // Find number of nodes in the path
+
+	microPathGPS = new GPSposition[lengthOfMicroPath]();
+	microPathXY = new PathPoint[lengthOfMicroPath]();
+
+	currentNode = targetNode;
+	for (int i=lengthOfMicroPath-1;i>=0;i--) {
+		translateXYtoGPSposition(currentNode->x,currentNode->y,microPathGPS[i]);
+		currentNode=currentNode->previousNodeInPath;
+	}
+
+	return true;
 }
 
-void PathPlanning::setMacroPath(const char* pathName) {
-//	FILE *fp = fopen(pathName,'rt');
-//	if (fp  == NULL); {
-//		printf("%s%s\n","Unable to open path file: ", strerror(errno));
-//		return;
-//	}
-//
-//	int nrOfCoordinates=0;
-//	fscanf (file, "%d", &nrOfCoordinates);
-
-
-}
-
-void PathPlanning::discoverNeighbor(aStarNode* baseNode, aStarNode* targetNode, int index, ObstaclePoint* obstacleSquaresOnDevice, int nrOfObstacles, float minDistanceToObstacle, float obstacleMatrixResolution) {
+bool PathPlanning::discoverNeighbor(const aStarNode *baseNode, const aStarNode *targetNode, int index, const ObstaclePoint* obstacleSquaresOnDevice, int nrOfObstacles, float minDistanceToObstacle, float obstacleMatrixResolution) const {
 	// This function discovers a neighbor node to baseNode, looking in 8 directions forward, and 8 directions backward
 	aStarNode* neighborNode;
 
@@ -98,7 +179,7 @@ void PathPlanning::discoverNeighbor(aStarNode* baseNode, aStarNode* targetNode, 
 		// close to any obstacle, and if so mark it as closed
 		neighborNode->isOnClosedSet = checkIfNodesAreToCloseToObstacles(neighborNode,1,obstacleSquaresOnDevice,nrOfObstacles,minDistanceToObstacle,obstacleMatrixResolution);
 	}
-	if (neighborNode->isOnClosedSet) {return;}	// neighborNode is either on closed set, or to close to an obstacle, so ignore it
+	if (neighborNode->isOnClosedSet) {return true;}	// neighborNode is either on closed set, or to close to an obstacle, so ignore it
 
 	// Calculate the new distance from start node and heuristics:
 	float neighborDistanceFromStartNode;
@@ -120,7 +201,7 @@ void PathPlanning::discoverNeighbor(aStarNode* baseNode, aStarNode* targetNode, 
 		if (index<7) {neighborNode->pathIsReversingFromPrevNode=false;}
 		else {neighborNode->pathIsReversingFromPrevNode=true;}
 
-		minHeap->addNode(neighborNode);
+		if(!minHeap->addNode(neighborNode)) {return false;} // Minheap is full, path cannot be found
 	}
 	else if (neighbourHeuristic < neighborNode->heuristic) {
 		neighborNode->distanceFromStartNode = neighborDistanceFromStartNode;
@@ -132,48 +213,28 @@ void PathPlanning::discoverNeighbor(aStarNode* baseNode, aStarNode* targetNode, 
 
 		minHeap->bubbleNode(neighborNode);
 	}
+	return true;
 }
 
-
-
-void PathPlanning::updatePathAndControlSignals(ObstaclePoint* obstacleSquares,int nrOfObstacles) {
-	/* This function does the following:
-	 *
-	 * -Updates the pathInLocalCoords based on the new vehicle GPS position
-	 * -Checks if the vehicle has passed the second GPS point in the path, and if then trims the path
-	 * -Checks if any new obstacles are detected along the path, and if then replans the path
-	 * -Sends the new control signals onto the CAN bus
+void PathPlanning::translateXYtoGPSposition(float x, float y, GPSposition& target) const {
+	/* The vehicle has the y axis pointing forward in the direction of travel. Rotate a point x
+	 * and y counter clockwise by heading makes y align with true north, and x align with true east.
+	 * Scale those and you get latc and longc
 	 */
+	float rotatedX = rotateAndGetX(x,y,vehicleState.currentHeading);
+	float rotatedY = rotateAndGetY(x,y,vehicleState.currentHeading);
 
-	int nrOfPointsInPath=4;
+	target.latc = vehicleState.currentPosition.latc + rotatedY * (1.0/LENGTH_OF_ONE_LAT_DEGREE_IN_METERS);
+	target.longc = vehicleState.currentPosition.longc + rotatedX * (1.0/LENGTH_OF_ONE_LONG_DEGREE_IN_METERS);
+}
 
-	// Update pathInLocalCoords based on the new GPS data
-	for (int i=0;i<nrOfPointsInPath;i++) {
-		/* First calculate the difference (in meters) between vehicleState->currentGPSPosition and getGPSpointInPath(i) in
-		 * lat and long. Call delta_lat y and delta_long x in a local coordinate system. Then remember that the heading of a
-		 * vehicle is defined as the angle from true north to the longitudinal centerline of the vehicle. The task is now
-		 * to rotate the point (x,y) clockwise by some angle so that the local x-axis now point in the same direction as the
-		 * vehicle longitudinal centerline. This angle is vehicleState->currentHeading-M_PI/2. To understand why M_PI/2 is subtracted
-		 * remember that a heading of 0 means the vehicle is traveling north. The local y axis will then align with the vehicle
-		 * longitudinal centerline. We want the x axis to align, and that is why we have to rotate the point with -M_PI/2 clockwise
-		 * The path will later be displayed overlaying the lidar data, so it is important that vehicleState->currentGPSposition
-		 * gives the exact location of the lidar sensor origin (x=0,y=0,z=0).
-		 */
+void PathPlanning::translateGPSpositionToXY(double latc, double longc, PathPoint& target) const {
+	// See comment in above function
+	float scaledY = (vehicleState.currentPosition.latc - latc) * LENGTH_OF_ONE_LAT_DEGREE_IN_METERS;
+	float scaledX = (vehicleState.currentPosition.longc - longc) * LENGTH_OF_ONE_LONG_DEGREE_IN_METERS;
 
-		//(pathInLocalCoords + i)->x = rotateAndGetX(getLongDistanceBetweenPoints(vehicleState->currentGPSposition,getGPSpointInPath(i)),getLatDistanceBetweenPoints(vehicleState->currentGPSposition,getGPSpointInPath(i)),-(vehicleState->currentHeading-M_PI/2));
-		//(pathInLocalCoords + i)->y = rotateAndGetY(getLongDistanceBetweenPoints(vehicleState->currentGPSposition,getGPSpointInPath(i)),getLatDistanceBetweenPoints(vehicleState->currentGPSposition,getGPSpointInPath(i)),-(vehicleState->currentHeading-M_PI/2));
-	}
-
-
-
-
-//	double currentPathAngle = getAngleBetweenPoints(getFirstPointInPath(),getSecondPointInPath());
-//	float
-//
-//	if () {
-//		currentPathIndex++;
-//		if (currentPathIndex==pointsInPath) {currentPathIndex=0;}
-//	}
+	target.x = rotateAndGetX(scaledX,scaledY,-vehicleState.currentHeading);
+	target.y = rotateAndGetY(scaledX,scaledY,-vehicleState.currentHeading);
 }
 
 // Hashtable:
@@ -184,14 +245,14 @@ PathPlanning::HashTable::~HashTable() {
 	clearHashTable();
 }
 
-int PathPlanning::HashTable::getIndex(float x, float y) {
+int PathPlanning::HashTable::getIndex(float x, float y) const {
 	// I tested this hasher in matlab, it is based on Java's hashCode(), and it gives pretty even results with obstacle matrix resolution
 	// between 0.01 and 0.2
 	int hash =100*abs(x)+100*abs(y)*abs(y);
 	return hash % HASH_TABLE_ENTRIES;
 }
 
-aStarNode* PathPlanning::HashTable::getAstarNode(float x, float y) {
+aStarNode* PathPlanning::HashTable::getAstarNode(float x, float y) const {
 	int arrayIndex = getIndex(x,y);
 	HashBucket* bucketPointer = *(hashArray + arrayIndex);
 
@@ -204,7 +265,7 @@ aStarNode* PathPlanning::HashTable::getAstarNode(float x, float y) {
 	return NULL;
 }
 
-void PathPlanning::HashTable::clearBucketList(HashBucket* bucket) {
+void PathPlanning::HashTable::clearBucketList(HashBucket* bucket) const {
 	// Deletes every entry in the bucket linked-list
 	if (bucket==NULL) {return;}
 
@@ -221,7 +282,7 @@ void PathPlanning::HashTable::clearHashTable() {
 }
 
 
-aStarNode* PathPlanning::HashTable::addAstarNode(float x, float y) {
+aStarNode *PathPlanning::HashTable::addAstarNode(float x, float y) {
 	aStarNode* addedNode = getAstarNode(x,y);
 	if (addedNode != NULL) {return addedNode;}
 
@@ -316,110 +377,57 @@ aStarNode* PathPlanning::MinHeap::popNode() {
 	return returnNode;
 }
 
+namespace {
+// Non member functions implementations:
+	__global__ void checkIfNodeIsToCloseToObstacle(const aStarNode* nodesOnDevice, int nrOfNodes, const ObstaclePoint* obstacleSquaresOnDevice, int nrOfObstacles, float minDistanceToObstacle, float obstacleMatrixResolution, bool* isToClosePointer) {
+		/* Think of the function as a matrix, where nodes are the rows, and obstacles are the columns. For each node/obstacle pair, see if
+		 * their distance is at least the min distance. To get the row and column index, row = index/columnSize, column = index - row*columnSize
+		 */
+		int myThreadID = blockIdx.x*blockDim.x+threadIdx.x, myNodeIndex = myThreadID/nrOfObstacles, myObstacleIndex = myThreadID-myNodeIndex*nrOfObstacles;
+		float distance,nodeX,nodeY,obstacleX,obstacleY;
 
-// Non member functions:
-__global__ void checkIfNodeIsToCloseToObstacle(aStarNode* nodesOnDevice, int nrOfNodes, ObstaclePoint* obstacleSquaresOnDevice, int nrOfObstacles, float minDistanceToObstacle, float obstacleMatrixResolution, bool* isToClosePointer) {
-	/* Think of the function as a matrix, where nodes are the rows, and obstacles are the columns. For each node/obstacle pair, see if
-	 * their distance is at least the min distance. To get the row and column index, row = index/columnSize, column = index - row*columnSize
-	 */
-	int myThreadID = blockIdx.x*blockDim.x+threadIdx.x, myNodeIndex = myThreadID/nrOfObstacles, myObstacleIndex = myThreadID-myNodeIndex*nrOfObstacles;
-	float distance,nodeX,nodeY,obstacleX,obstacleY;
+		if (myNodeIndex < nrOfNodes) {
+			// The positions of the nodes and obstacles are the center distances of their respective square
+			nodeX = (nodesOnDevice+myNodeIndex)->x + obstacleMatrixResolution/2;
+			nodeY = (nodesOnDevice+myNodeIndex)->y + obstacleMatrixResolution/2;
+			obstacleX = (obstacleSquaresOnDevice + 4*myObstacleIndex)->x +obstacleMatrixResolution/2;
+			obstacleY = (obstacleSquaresOnDevice + 4*myObstacleIndex)->y +obstacleMatrixResolution/2;
 
-	if (myNodeIndex < nrOfNodes) {
-		// The positions of the nodes and obstacles are the center distances of their respective square
-		nodeX = (nodesOnDevice+myNodeIndex)->x + obstacleMatrixResolution/2;
-		nodeY = (nodesOnDevice+myNodeIndex)->y + obstacleMatrixResolution/2;
-		obstacleX = (obstacleSquaresOnDevice + 4*myObstacleIndex)->x +obstacleMatrixResolution/2;
-		obstacleY = (obstacleSquaresOnDevice + 4*myObstacleIndex)->y +obstacleMatrixResolution/2;
+			distance = sqrt((nodeX-obstacleX)*(nodeX-obstacleX)+(nodeY-obstacleY)*(nodeY-obstacleY));
 
-		distance = sqrt((nodeX-obstacleX)*(nodeX-obstacleX)+(nodeY-obstacleY)*(nodeY-obstacleY));
+			if (distance < minDistanceToObstacle) {*(isToClosePointer)=true;}
+		}
+	}
 
-		if (distance < minDistanceToObstacle) {*(isToClosePointer)=true;}
+	bool checkIfNodesAreToCloseToObstacles(const aStarNode* nodes, int nrOfNodes, const ObstaclePoint *obstacleSquaresOnDevice, int nrOfObstacles, float minDistanceToObstacle, float obstacleMatrixResolution) {
+		// Returns false if all nodes in nodes have a min distance of minDistance to all obstacles in obstacleSquaresOnDevice, otherwise returns true
+		bool* isToClosePointer;
+		CUDA_CHECK_RETURN(cudaMalloc((void**)&isToClosePointer,sizeof(bool)));
+		CUDA_CHECK_RETURN(cudaMemset(isToClosePointer,0,sizeof(bool)));
+
+		aStarNode* nodesOnDevice;
+		CUDA_CHECK_RETURN(cudaMalloc((void**)&nodesOnDevice,sizeof(aStarNode)*nrOfNodes));
+
+		int numberOfKernelBlocks = nrOfNodes*nrOfObstacles/256+1;
+		checkIfNodeIsToCloseToObstacle<<<numberOfKernelBlocks,256>>>(nodesOnDevice,nrOfNodes,obstacleSquaresOnDevice,nrOfObstacles,minDistanceToObstacle,obstacleMatrixResolution,isToClosePointer);
+
+		bool isToClose;
+		CUDA_CHECK_RETURN(cudaMemcpy(&isToClose,isToClosePointer,sizeof(bool),cudaMemcpyDeviceToHost));
+		CUDA_CHECK_RETURN(cudaFree(isToClosePointer));
+		CUDA_CHECK_RETURN(cudaFree(nodesOnDevice));
+		cudaDeviceSynchronize(); // TODO change to specific instead of global stream
+		return isToClose;
+	}
+
+	float rotateAndGetX(float x, float y, double angle) {
+		// Rotates the point by the angle counter clockwise and returns its new x coordinate
+		return x * cos(angle) - y * sin(angle);
+	}
+
+	float rotateAndGetY(float x, float y, double angle) {
+		// Rotates the point by the angle counter clockwise and returns its new y coordinate
+		return x * sin(angle) + y * cos(angle);
 	}
 }
-
-bool checkIfNodesAreToCloseToObstacles(aStarNode* nodes, int nrOfNodes, ObstaclePoint* obstacleSquaresOnDevice, int nrOfObstacles, float minDistanceToObstacle, float obstacleMatrixResolution) {
-	// Returns false if all nodes in nodes have a min distance of minDistance to all obstacles in obstacleSquaresOnDevice, otherwise returns true
-	bool* isToClosePointer;
-	CUDA_CHECK_RETURN(cudaMalloc((void**)&isToClosePointer,sizeof(bool)));
-	CUDA_CHECK_RETURN(cudaMemset(isToClosePointer,0,sizeof(bool)));
-
-	aStarNode* nodesOnDevice;
-	CUDA_CHECK_RETURN(cudaMalloc((void**)&nodesOnDevice,sizeof(aStarNode)*nrOfNodes));
-
-	int numberOfKernelBlocks = nrOfNodes*nrOfObstacles/256+1;
-	checkIfNodeIsToCloseToObstacle<<<numberOfKernelBlocks,256>>>(nodesOnDevice,nrOfNodes,obstacleSquaresOnDevice,nrOfObstacles,minDistanceToObstacle,obstacleMatrixResolution,isToClosePointer);
-
-	bool isToClose;
-	CUDA_CHECK_RETURN(cudaMemcpy(&isToClose,isToClosePointer,sizeof(bool),cudaMemcpyDeviceToHost));
-	CUDA_CHECK_RETURN(cudaFree(isToClosePointer));
-	CUDA_CHECK_RETURN(cudaFree(nodesOnDevice));
-	cudaDeviceSynchronize(); // TODO change to specific instead of global stream
-	return isToClose;
-}
-
-
-//double getAngleBetweenPoints(OpenGLvertex* fromPoint,OpenGLvertex* toPoint) {
-//	double dx = toPoint->x - fromPoint->x;
-//	double dy = toPoint->y - fromPoint->y;
-//	return atan2(dx,dy);
-//}
-
-float rotateAndGetX(float x, float y, double angle) {
-	// Rotates the point by the angle counter clockwise and returns its new x coordinate
-	return x * cos(angle) - y * sin(angle);
-}
-
-float rotateAndGetY(float x, float y, double angle) {
-	// Rotates the point by the angle counter clockwise and returns its new y coordinate
-	return x * sin(angle) + y * cos(angle);
-}
-
-float getLongDistanceBetweenPoints(GPSposition* fromPoint, GPSposition* toPoint) {
-	// Returns the longitudinal distance in meters from fromPoint to toPoint
-	int lengthOfDegreeLongInMeters = 57141;
-	return lengthOfDegreeLongInMeters*(toPoint->longc - fromPoint->longc);
-}
-
-float getLatDistanceBetweenPoints(GPSposition* fromPoint, GPSposition* toPoint) {
-	// Returns the latitudinal distance in meters from fromPoint to toPoint
-	int lengthOfDegreeLatInMeters = 111398;
-	return lengthOfDegreeLatInMeters*(toPoint->latc - fromPoint->latc);
-}
-
-
-//GPSpoint* PathPlanning::getGPSpointInPath(int index) {
-//	int arrayIndex = index + currentPathIndex;
-//	if (arrayIndex>=nrOfPointsInPath) {arrayIndex-=nrOfPointsInPath;}
-//
-//	return pathInGPScoords + arrayIndex;
-//}
-
-//aStarNodeListEntry* PathPlanning::getNeighborList(aStarNode* baseNode, float obstacleMatrixResolution) {
-//	/*
-//	 *
-//	 *
-//	 */
-//
-//	aStarNodeListEntry* neighborList = new aStarNodeListEntry();
-//	neighborList->node = getNeighbor(baseNode,0,obstacleMatrixResolution);
-//	for (int i=1;i<14;i++) {
-//		neighborList->nextListEntry = new aStarNodeListEntry();
-//		neighborList->nextListEntry->node = getNeighbor(baseNode,i,obstacleMatrixResolution);
-//	}
-//
-//
-//	return neighborList;
-//}
-//
-//void PathPlanning::clearNeighborsList(aStarNodeListEntry* listEntry) {
-//	if (listEntry->nextListEntry==NULL) {
-//		delete listEntry;
-//		return;
-//	}
-//
-//	clearNeighborsList(listEntry->nextListEntry);
-//	delete listEntry;
-//}
 
 

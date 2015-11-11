@@ -45,4 +45,6 @@ src/Input.o : ../src/Input.cpp \
     /usr/include/sched.h \
     /usr/include/x86_64-linux-gnu/bits/sched.h \
     /usr/include/x86_64-linux-gnu/bits/timex.h \
-    /usr/include/x86_64-linux-gnu/bits/setjmp.h
+    /usr/include/x86_64-linux-gnu/bits/setjmp.h \
+    ../src/Headers/PathPlanning.h \
+    ../src/Headers/Structs.h

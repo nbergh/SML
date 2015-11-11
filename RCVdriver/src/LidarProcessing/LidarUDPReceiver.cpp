@@ -6,12 +6,14 @@
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
-//#include <sys/time.h>
+
+void* receiverThreadFunction(void * thisPointer);// TODO make static
 
 //Constructor
-LidarUDPReceiver::LidarUDPReceiver(int udpPort) {
+LidarUDPReceiver::LidarUDPReceiver(const int udpPort, char* rawLidarData) {
 	// First allocate the tempPacket buffer, and create the UDP socket:
-	tempPacketBuffer = new char[1206];
+	this->rawLidarData=rawLidarData;
+
 	udpSocketID = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 	if (udpSocketID==-1) {
 		printf("%s%s\n","Unable to create socket: ", strerror(errno));
@@ -35,6 +37,7 @@ LidarUDPReceiver::LidarUDPReceiver(int udpPort) {
 	printf("%s%d%s\n","Trying to receive lidar data on port ", udpPort, "...");
 	tryToReceiveLidarPacket();
 	printf("%s\n","...success!");
+	startReceiverThread();
 }
 
 LidarUDPReceiver::~LidarUDPReceiver() {
@@ -42,14 +45,7 @@ LidarUDPReceiver::~LidarUDPReceiver() {
 	stopReceiverThread=true;
 	pthread_join(receiverThreadID,NULL);
 
-	delete[] tempPacketBuffer;
 	close(udpSocketID);
-}
-
-void* LidarUDPReceiver::threadEntryFunction(void* thisPointer) {
-	// A static entry function for receiveUDP
-	((LidarUDPReceiver*)thisPointer)->receiverThreadFunction();
-	return NULL;
 }
 
 void LidarUDPReceiver::tryToReceiveLidarPacket() {
@@ -65,33 +61,37 @@ void LidarUDPReceiver::tryToReceiveLidarPacket() {
 	}
 }
 
-bool LidarUDPReceiver::isLidarPacket(char* packet) {
-	if (packet[0]==-1 && packet[1]==-18 && packet[1205]== 34) {return true;}
-	return false;
-}
-
-void LidarUDPReceiver::startReceiverThread(char* rawLidarData) {
+void LidarUDPReceiver::startReceiverThread() {
 	// Starts the receiver thread; an infinite loop that continuously updates rawLidarData
 	this->rawLidarData=rawLidarData;
 	stopReceiverThread=false;
 
 	//Start the receiver thread
-	if(pthread_create(&receiverThreadID,NULL,threadEntryFunction,this)) {
+	if(pthread_create(&receiverThreadID,NULL,receiverThreadFunction,this)) {
 		printf("%s%s\n","Unable to create thread: ", strerror(errno));
 		exit(-1);
 	}
 }
 
-void LidarUDPReceiver::receiverThreadFunction() {
-	printf("%s\n","UDP receiver thread started");
+bool LidarUDPReceiver::isLidarPacket(const char* packet) {
+	if (packet[0]==-1 && packet[1]==-18 && packet[1205]== 34) {return true;}
+	return false;
+}
+
+
+// Non members:
+void* receiverThreadFunction(void * thisPointer) {
+	// This functions needs to be non-member, so pthread_create works
+	bool *stopReceiverThread = &((LidarUDPReceiver*)thisPointer)->stopReceiverThread;
+	char *rawLidarData = ((LidarUDPReceiver*)thisPointer)->rawLidarData, *tempPacketBuffer =((LidarUDPReceiver*)thisPointer)->tempPacketBuffer ;
 
 	// Start listening to data:
 	int receivedPacketLength=0,currentRawBufferOffset=0;
 
 	//timeval curTime,oldTime;
 
-	while(!stopReceiverThread) {
-		tryToReceiveLidarPacket();
+	while(!*stopReceiverThread) {
+		((LidarUDPReceiver*)thisPointer)->tryToReceiveLidarPacket();
 		// Copy the packet data from tempPacketBuffer to rawLidarBuffer, minus the last 6 bytes that are factory bytes
 		memcpy(rawLidarData+currentRawBufferOffset,tempPacketBuffer,1200);
 		currentRawBufferOffset+=1200;
@@ -104,8 +104,6 @@ void LidarUDPReceiver::receiverThreadFunction() {
 	printf("%s\n","UDP receiver thread exited");
 	pthread_exit(NULL);
 }
-
-
 
 
 
