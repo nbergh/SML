@@ -7,10 +7,12 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#define UDP_PORT 2368
+
 void* receiverThreadFunction(void * thisPointer);// TODO make static
 
 //Constructor
-LidarUDPReceiver::LidarUDPReceiver(const int udpPort, char* rawLidarData) {
+LidarUDPReceiver::LidarUDPReceiver(char* rawLidarData) {
 	// First allocate the tempPacket buffer, and create the UDP socket:
 	this->rawLidarData=rawLidarData;
 

@@ -12,8 +12,7 @@
 #include "Headers/PathPlanning.h"
 #include "Headers/Input.h"
 #include "Headers/Graphics.h"
-
-#define CONTROLLER_UPDATE_RATE 10 //Hz
+#include "Headers/Parameters.h"
 
 LidarProcessing* lidarProcessing;
 PositionEstimation* positionEstimation;

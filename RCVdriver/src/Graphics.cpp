@@ -1,9 +1,8 @@
 #include <GL/freeglut.h>
 #include <math.h>
 
+#include "Headers/Parameters.h"
 #include "Headers/Structs.h"
-
-#define FRAMERATE 60 //Hz
 
 /* This cpp file would normally be represented as a class, however the callback functions for glut (drawDisplay,
  * handleKeyDown, handleKeyUp, handleMouseClick, handleMouseMove, updateFrame and updateController) cannot be
@@ -67,7 +66,7 @@ namespace { // Graphics namespace
 		glutKeyboardUpFunc(handleKeyUp);
 		glutMouseFunc(handleMouseClick);
 		glutMotionFunc(handleMouseMove);
-		glutTimerFunc(0,updateFrame,FRAMERATE); // The frame update function
+		glutTimerFunc(0,updateFrame,GRAPHICS_FRAME_RATE); // The frame update function
 
 		// Set glut and opengl options:
 		glutSetOption(GLUT_ACTION_ON_WINDOW_CLOSE,GLUT_ACTION_GLUTMAINLOOP_RETURNS);

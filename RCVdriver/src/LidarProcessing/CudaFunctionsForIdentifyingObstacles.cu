@@ -89,7 +89,7 @@ namespace { // Limit scope to translation unit
 	}
 }
 
-int identifyObstaclesInLidarData(const LidarMemoryPointers &lidarMemoryPointers, float obstaclePointSideLength,float minObstacleDeltaZ, int maxNumberOfObstacles) {
+void identifyObstaclesInLidarData(const LidarMemoryPointers &lidarMemoryPointers, float obstaclePointSideLength,float minObstacleDeltaZ, int maxNumberOfObstacles, int* currentNrOfObstacles) {
 	/* This function uses two integer matrices called obstacleMatrixForMaxZOnGPU and obstacleMatrixForMinZOnGPU. Every field
 	 * in those matrices represents a coordinate in x and y. Every LidarDataPoint can map its x and y position into a field of
 	 * those matrices, by rounding the float x and float y of their coordinates, into int x and int y values that represents
@@ -135,10 +135,8 @@ int identifyObstaclesInLidarData(const LidarMemoryPointers &lidarMemoryPointers,
 	CUDA_CHECK_RETURN(cudaMemcpy(lidarMemoryPointers.obstacleSquares, lidarMemoryPointers.obstacleSquaresOnGPU, lidarMemoryPointers.sizeOfObstacleSquares, cudaMemcpyDeviceToHost));
 
 	// Set the number of obstacles idenitified in lidarMemoryPointers.currentNrOfObstacles
-	int nrOfObstacles;
-	CUDA_CHECK_RETURN(cudaMemcpy(&nrOfObstacles, deviceObstacleArrayIndex, sizeof(int), cudaMemcpyDeviceToHost));
+	CUDA_CHECK_RETURN(cudaMemcpy(currentNrOfObstacles, deviceObstacleArrayIndex, sizeof(int), cudaMemcpyDeviceToHost));
 	CUDA_CHECK_RETURN(cudaFree(deviceObstacleArrayIndex)); // TODO this shouldnt be done every iteration
 
 	cudaDeviceSynchronize();
-	return nrOfObstacles;
 }

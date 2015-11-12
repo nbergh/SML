@@ -4,7 +4,6 @@
 #include "../../Headers/Structs.h"
 
 class PositionEstimation {
-
 	VehicleState* vehicleState; // The state of the vehicle
 
 public:

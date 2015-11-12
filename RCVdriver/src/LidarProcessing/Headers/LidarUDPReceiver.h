@@ -21,7 +21,7 @@ class LidarUDPReceiver {
 	friend void* receiverThreadFunction(void *arg); // Thread function
 
 public:
-	LidarUDPReceiver(const int udpPort, char* rawLidarData);
+	LidarUDPReceiver(char* rawLidarData);
 	~LidarUDPReceiver();
 };
 

@@ -45,4 +45,5 @@ src/Graphics.o : ../src/Graphics.cpp \
     /usr/include/x86_64-linux-gnu/bits/nan.h \
     /usr/include/x86_64-linux-gnu/bits/mathdef.h \
     /usr/include/x86_64-linux-gnu/bits/mathcalls.h \
+    ../src/Headers/Parameters.h \
     ../src/Headers/Structs.h

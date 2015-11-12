@@ -111,12 +111,13 @@ src/PathPlanning.o : ../src/PathPlanning.cu \
     /usr/local/cuda-7.5/bin/../targets/x86_64-linux/include/surface_indirect_functions.h \
     /usr/local/cuda-7.5/bin/../targets/x86_64-linux/include/surface_indirect_functions.hpp \
     /usr/local/cuda-7.5/bin/../targets/x86_64-linux/include/device_launch_parameters.h \
-    ../src/Headers/PathPlanning.h \
-    ../src/Headers/Structs.h \
-    ../src/Headers/CudaErrorCheckFunctions.h \
     /usr/include/errno.h \
     /usr/include/x86_64-linux-gnu/bits/errno.h \
     /usr/include/linux/errno.h \
     /usr/include/x86_64-linux-gnu/asm/errno.h \
     /usr/include/asm-generic/errno.h \
-    /usr/include/asm-generic/errno-base.h
+    /usr/include/asm-generic/errno-base.h \
+    ../src/Headers/Parameters.h \
+    ../src/Headers/PathPlanning.h \
+    ../src/Headers/Structs.h \
+    ../src/Headers/CudaErrorCheckFunctions.h

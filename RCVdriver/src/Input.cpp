@@ -12,8 +12,9 @@ namespace {
 }
 
 
-Input::Input(PathPlanning& pathPlanning) :
-	pathPlanning(pathPlanning) {
+Input::Input(VehicleStatus& vehicleStatus, PathPlanning& pathPlanning):
+		vehicleStatus(vehicleStatus),
+		pathPlanning(pathPlanning) {
 	startParserThread();
 }
 
@@ -36,6 +37,7 @@ void Input::startParserThread() {
 void* parserThreadFunction(void* objectPointer) {
 	// Read command from stdin. Has to be a non-member, since the argument function to pthread_create only accepts non-member functions
 	PathPlanning& pathPlanning = ((Input*)objectPointer)->pathPlanning;
+	VehicleStatus& vehicleStatus = ((Input*)objectPointer)->vehicleStatus;
 	bool& stopParserThread = ((Input*)objectPointer)->stopParserThread;
 	char outputCommand[50], inputCommand[50];
 
@@ -54,11 +56,13 @@ void* parserThreadFunction(void* objectPointer) {
 			continue;
 		}
 		if (compareStrings(inputCommand,"start",5)) {
-			printf("%s\n","Vechile started");
+			if(!vehicleStatus.isRunning) {printf("%s\n","RCV started");}
+			vehicleStatus.isRunning=true;
 			continue;
 		}
 		if (compareStrings(inputCommand,"stop",4)) {
-			printf("%s\n","Vechile stopped");
+			if (vehicleStatus.isRunning) {printf("%s\n","RCV stopped");}
+			vehicleStatus.isRunning=false;
 			continue;
 		}
 

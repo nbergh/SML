@@ -6,7 +6,8 @@
 
 class Input {
 	//Externally located:
-	PathPlanning &pathPlanning; // Pointer to the pathPlanning object, so the parser can call its public functions
+	VehicleStatus& vehicleStatus;
+	PathPlanning& pathPlanning; // Pointer to the pathPlanning object, so the parser can call its public functions
 
 	//Internally located:
 	bool stopParserThread;
@@ -16,7 +17,7 @@ class Input {
 	friend void* parserThreadFunction(void* arg);
 
 public:
-	Input(PathPlanning &pathPlanning);
+	Input(VehicleStatus& vehicleStatus, PathPlanning& pathPlanning);
 	~Input();
 };
 

@@ -11,10 +11,15 @@ struct aStarNode {
 	 * x and y are later set by HashTable::addAstarNode()
 	 * heapArrayIndex is set by MinHeap::bubbleNode() or MinHeap::popNode()
 	 * Everything else is set by PathPlanning::discoverNeighbor()
+	 *
+	 * localPathAngleFromPreviousNodeInPath is the angle from {the vector going from
+	 * the previousNodeInPath to this node} to {the vector going forward from the vehicle
+	 * along its longitudinal centerline}. It is not a heading, since it has no relation
+	 * with north, and only has a meaning in the vehicle local coordinate system
 	 */
 	float x, y, distanceFromStartNode, heuristic; // TODO make x,y const
 	bool isOnOpenSet, isOnClosedSet, pathIsReversingFromPrevNode;
-	double angleFromPreviosNodeInPath;
+	double localPathAngleFromPreviousNode;
 	int heapArrayIndex;
 	const aStarNode *previousNodeInPath;
 };
@@ -57,29 +62,32 @@ class PathPlanning {
 	const VehicleState& vehicleState; // Current vehicle state
 	const ObstaclePoint* obstacleSquaresOnGPU;
 	const int& currentNrOfObstacles;
+	VehicleStatus& vehicleStatus;
 
 	// Internal vars
 	HashTable* hashTable;
 	MinHeap* minHeap;
-	GPSposition* macroPathGPS; // The main GPS path (start to goal) as a linked list
-	GPSposition* microPathGPS; // The path to the next point in the mainGPSpath as a linked list
-	PathPoint* microPathXY; // The same path as microPathGPS, but in x,y coordinates
+	PathPointInGPScords* macroPathGPS; // The main GPS path (start to goal) as a linked list
+	PathPointInGPScords* microPathGPS; // The path to the next point in the mainGPSpath as a linked list
+	PathPointInLocalXY* microPathXY; // The same path as microPathGPS, but in x,y coordinates
 	int lengthOfMacroPath,lengthOfMicroPath,currentIndexInMacroPath,currentIndexInMicroPath; // The attributes of the paths
 
 	// Functions
-	bool generateMicroPath(float targetX, float targetY, const ObstaclePoint* obstacleSquaresOnDevice, int nrOfObstacles, float minDistanceToObstacle, float obstacleMatrixResolution);
-	bool discoverNeighbor(const aStarNode* baseNode, const aStarNode* targetNode, int index, const ObstaclePoint* obstacleSquaresOnDevice, int nrOfObstacles, float minDistanceToObstacle, float obstacleMatrixResolution) const;
-	void translateMicroPathToXY() const;
-	void translateXYtoGPSposition(float x, float y, GPSposition& target) const;
-	void translateGPSpositionToXY(double latc, double longc, PathPoint& target) const;
+	void generateMicroPath(GPSposition targetPosition);
+	bool discoverNeighbor(const aStarNode* baseNode, const aStarNode* targetNode, int index) const;
+	void translateMicroPathToLocalXY() const;
+	void translateLocalXYtoGPSposition(float x, float y, GPSposition& target) const;
+	void translateGPSpositionToLocalXY(double latc, double longc, float& x, float& y) const;
+	void clearAllPaths(bool includeMacroPath);
+	bool updatePathIndexes();
 
 	public:
-		PathPlanning(const VehicleState& vehicleState, const ObstaclePoint* obstaclePoints, const int& currentNrOfObstacles);
+		PathPlanning(const VehicleState& vehicleState, const ObstaclePoint* obstaclePoints, const int& currentNrOfObstacles, VehicleStatus& vehicleStatus);
 		~PathPlanning();
 
 		bool setMacroPath(const char* filePath);
-		void updatePathAndControlSignals() const;
-		const PathPoint* getMicroPathXY() const;
+		void updatePathAndControlSignals();
+		const PathPointInLocalXY* getMicroPathXY() const;
 
 };
 

@@ -2,7 +2,6 @@
 #include "Headers/LidarCudaFunctions.h"
 #include "../Headers/CudaErrorCheckFunctions.h"
 
-#define LIDAR_UDP_PORT 2368 // The port that receives lidar data
 #define MAX_OBSTACLE_DETECTION_DISTANCE 20 // The maximal distance (in meters) that an obstacle can be identified in
 #define OBSTACLE_POINT_SIDE_LENGTH 0.05 // The length of one side in the square that represents an obstacle point (decreasing this value by a factor of X will require X² times more device memory)
 #define MIN_OBSTACLE_DELTA_Z 0.1 // The difference in z coordinates (in meters) required for two points with the same x and y coordinates to be registered as an obstacle
@@ -15,7 +14,7 @@ LidarProcessing::LidarProcessing() {
 	allocateMemory();
 
 	// Then initialize the UDP socket, test the connection, and start the UDP receiver thread:
-	lidarUDPReceiver = new LidarUDPReceiver(LIDAR_UDP_PORT,lidarMemoryPointers->rawLidarData);
+	lidarUDPReceiver = new LidarUDPReceiver(lidarMemoryPointers->rawLidarData);
 }
 
 LidarProcessing::~LidarProcessing() {

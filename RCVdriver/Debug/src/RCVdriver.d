@@ -140,6 +140,7 @@ src/RCVdriver.o : ../src/RCVdriver.cu \
     ../src/Headers/Structs.h \
     ../src/Headers/Input.h \
     ../src/Headers/Graphics.h \
+    ../src/Headers/Parameters.h \
     /usr/include/unistd.h \
     /usr/include/x86_64-linux-gnu/bits/posix_opt.h \
     /usr/include/x86_64-linux-gnu/bits/environments.h \
