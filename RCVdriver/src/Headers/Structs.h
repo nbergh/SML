@@ -13,8 +13,7 @@ struct ObstaclePoint {
 };
 struct PathPointInLocalXY {
 	float x,y;
-	char r,b,g; // Colors of the point
-	double headingFromPrevPathPoint;
+	unsigned char r,b,g; // Colors of the point
 };
 
 //Not used by openGL:
@@ -29,6 +28,7 @@ struct PathPointInGPScords {
 	GPSposition position;
 	float latDistanceFromPrevPathPoint,longDistanceFromPrevPathPoint; // The distance in meters from prevPathPoint to this point, lat and long
 	double headingFromPrevPathPoint;
+	bool isReversingFromPrevNode;
 };
 struct VehicleState {
 	// The position and heading of the vehicle

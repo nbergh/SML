@@ -56,6 +56,7 @@ class PathPlanning {
 			bool addNode(aStarNode* node); // Returns false if the heap is full. Also stores heapArrayIndex in the aStarNode
 			void bubbleNode(aStarNode* node); // Updates the heap based on the new (lower) heuristic, and updates heapArrayIndex in the node
 			aStarNode* popNode();
+			int getAvailableSpace() const;
 	};
 
 	// External vars
@@ -70,24 +71,27 @@ class PathPlanning {
 	PathPointInGPScords* macroPathGPS; // The main GPS path (start to goal) as a linked list
 	PathPointInGPScords* microPathGPS; // The path to the next point in the mainGPSpath as a linked list
 	PathPointInLocalXY* microPathXY; // The same path as microPathGPS, but in x,y coordinates
+	PathPointInLocalXY* macroPathXY; // The same path as macroPathGPS, but in x,y coordinates
 	int lengthOfMacroPath,lengthOfMicroPath,currentIndexInMacroPath,currentIndexInMicroPath; // The attributes of the paths
 
 	// Functions
-	void generateMicroPath(GPSposition targetPosition);
-	bool discoverNeighbor(const aStarNode* baseNode, const aStarNode* targetNode, int index) const;
-	void translateMicroPathToLocalXY() const;
-	void translateLocalXYtoGPSposition(float x, float y, GPSposition& target) const;
-	void translateGPSpositionToLocalXY(double latc, double longc, float& x, float& y) const;
-	void clearAllPaths(bool includeMacroPath);
 	bool updatePathIndexes();
+	void translateMacroPathToXY();
+	bool translateMicroPathToXYandCheckIfMicroPathIsTooCloseToObstacles() const;
+	bool generateMicroPath(float targetX, float targetY);
+	void discoverNeighbor(const aStarNode* baseNode, const aStarNode* targetNode, int index) const;
+	bool checkIfaStarNodeIsTooCloseToObstacles(aStarNode node, double localPathAngleFromPreviousNode) const;
+	void clearAllPaths(bool includeMacroPath);
+	void translateLocalXYtoGPSposition(float x, float y, GPSposition& target) const;
 
 	public:
-		PathPlanning(const VehicleState& vehicleState, const ObstaclePoint* obstaclePoints, const int& currentNrOfObstacles, VehicleStatus& vehicleStatus);
+		PathPlanning(const ObstaclePoint* obstaclePoints, const int& currentNrOfObstacles, const VehicleState& vehicleState, VehicleStatus& vehicleStatus);
 		~PathPlanning();
 
-		bool setMacroPath(const char* filePath);
 		void updatePathAndControlSignals();
+		bool setMacroPath(const char* filePath);
 		const PathPointInLocalXY* getMicroPathXY() const;
+		const PathPointInLocalXY* getMacroPathXY() const;
 
 };
 

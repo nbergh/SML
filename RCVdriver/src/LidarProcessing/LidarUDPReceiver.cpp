@@ -26,7 +26,7 @@ LidarUDPReceiver::LidarUDPReceiver(char* rawLidarData) {
 	socketLength = sizeof(socketAddressMe);
 	memset((char *) &socketAddressMe, 0, sizeof(socketAddressMe)); // Zero out socketAddressMe
 	socketAddressMe.sin_family = AF_INET;
-	socketAddressMe.sin_port = htons(udpPort);
+	socketAddressMe.sin_port = htons(UDP_PORT);
 	socketAddressMe.sin_addr.s_addr = htonl(INADDR_ANY);
 
 	// Bind the socket to socketAddress
@@ -36,7 +36,7 @@ LidarUDPReceiver::LidarUDPReceiver(char* rawLidarData) {
 	}
 
 	// Test to see if lidar data can be received:
-	printf("%s%d%s\n","Trying to receive lidar data on port ", udpPort, "...");
+	printf("%s%d%s\n","Trying to receive lidar data on port ", UDP_PORT, "...");
 	tryToReceiveLidarPacket();
 	printf("%s\n","...success!");
 	startReceiverThread();

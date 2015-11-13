@@ -34,8 +34,8 @@ int main(void)
 	// First initialize the main classes:
 	lidarProcessing = new LidarProcessing();
 	positionEstimation = new PositionEstimation();
-	pathPlanning = new PathPlanning(positionEstimation->getCurrentVehicleState(),lidarProcessing->getObstacleSquares(),lidarProcessing->getCurrentNrOfObstacles());
-	input = new Input(*pathPlanning);
+//	pathPlanning = new PathPlanning(lidarProcessing->getObstacleSquaresOnGPU(),);
+//	input = new Input(*pathPlanning);
 
 	// Set the controllerMainLoopStep to execute periodically:
 

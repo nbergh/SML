@@ -80,6 +80,11 @@ const ObstaclePoint* LidarProcessing::getObstacleSquares() const {
 	return lidarMemoryPointers->obstacleSquares;
 }
 
+const ObstaclePoint* LidarProcessing::getObstacleSquaresOnGPU() const {
+	return lidarMemoryPointers->obstacleSquaresOnGPU;
+}
+
 const int &LidarProcessing::getCurrentNrOfObstacles() const {
 	return currentNrOfObstacles;
 }
+

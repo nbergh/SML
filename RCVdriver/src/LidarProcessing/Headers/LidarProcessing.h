@@ -32,6 +32,7 @@ class LidarProcessing {
 		void processLidarData();
 		const LidarDataPoint* getLidarDataPoints() const;
 		const ObstaclePoint* getObstacleSquares() const;
+		const ObstaclePoint* getObstacleSquaresOnGPU() const;
 		const int& getCurrentNrOfObstacles() const;
 };
 
