@@ -4,27 +4,22 @@
 #include "../../Headers/Structs.h"
 #include "LidarUDPReceiver.h"
 
-struct LidarMemoryPointers {
-	char *rawLidarData, *rawLidarDataOnGPU; // One rawLidarDataBuffer per lidar unit
-	int sizeOfRawLidarData;
-
-	LidarDataPoint *lidarDataPoints, *lidarDataPointsOnGPU;
-	int sizeOfLidarDataPoints;
-
-	ObstaclePoint *obstacleSquares, *obstacleSquaresOnGPU;
-	int sizeOfObstacleSquares;
-
-	int *obstacleMatrixForMaxZOnGPU, *obstacleMatrixForMinZOnGPU;
-	int sizeOfObstacleMatrix,numberOfMatrixFieldsPerSide;
-};
-
 class LidarProcessing {
-	LidarMemoryPointers* lidarMemoryPointers;
+	//Pointers to device and host memory:
+	int sizeOfRawLidarData,sizeOfLidarDataPoints,sizeOfObstacleSquares,sizeOfObstacleMatrix;
+	char *rawLidarData, *rawLidarDataOnGPU;
+	LidarDataPoint *lidarDataPoints, *lidarDataPointsOnGPU;
+	ObstaclePoint *obstacleSquares, *obstacleSquaresOnGPU;
+	int *obstacleMatrixForMaxZOnGPU, *obstacleMatrixForMinZOnGPU;
+
+	// Members:
 	LidarUDPReceiver* lidarUDPReceiver;
 	int currentNrOfObstacles;
 
-	void allocateMemory() const;
+	void allocateMemory();
 	void freeMemory() const;
+	void translateLidarDataFromRawToXYZ();
+	void identifyObstaclesInLidarData();
 
 	public:
 		LidarProcessing();

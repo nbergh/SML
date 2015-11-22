@@ -6,25 +6,24 @@
 #define HEAP_SIZE 5000 // The heap has limited space
 #define HASH_TABLE_ENTRIES 5000 // The hash table has unlimited space, but a limited number of possible hashes
 
-struct aStarNode {
-	/* Everything is initialized to zero on struct initialization
-	 * x and y are later set by HashTable::addAstarNode()
-	 * heapArrayIndex is set by MinHeap::bubbleNode() or MinHeap::popNode()
-	 * Everything else is set by PathPlanning::discoverNeighbor()
-	 *
-	 * localPathAngleFromPreviousNodeInPath is the angle from {the vector going from
-	 * the previousNodeInPath to this node} to {the vector going forward from the vehicle
-	 * along its longitudinal centerline}. It is not a heading, since it has no relation
-	 * with north, and only has a meaning in the vehicle local coordinate system
-	 */
-	float x, y, distanceFromStartNode, heuristic; // TODO make x,y const
-	bool isOnOpenSet, isOnClosedSet, pathIsReversingFromPrevNode;
-	double localPathAngleFromPreviousNode;
-	int heapArrayIndex;
-	const aStarNode *previousNodeInPath;
-};
-
 class PathPlanning {
+	struct aStarNode {
+		/* Everything is initialized to zero on struct initialization
+		 * x and y are later set by HashTable::addAstarNode()
+		 * heapArrayIndex is set by MinHeap::bubbleNode() or MinHeap::popNode()
+		 * Everything else is set by PathPlanning::discoverNeighbor()
+		 *
+		 * localPathAngleFromPreviousNodeInPath is the angle from {the vector going from
+		 * the previousNodeInPath to this node} to {the vector going forward from the vehicle
+		 * along its longitudinal centerline}. It is not a heading, since it has no relation
+		 * with north, and only has a meaning in the vehicle local coordinate system
+		 */
+		float x, y, distanceFromStartNode, heuristic; // TODO make x,y const
+		bool isOnOpenSet, isOnClosedSet, pathIsReversingFromPrevNode;
+		double localPathAngleFromPreviousNode;
+		int heapArrayIndex;
+		const aStarNode *previousNodeInPath;
+	};
 	class HashTable {
 		struct HashBucket {
 			aStarNode node; // aStarNodes are stored here
@@ -85,11 +84,11 @@ class PathPlanning {
 	void translateLocalXYtoGPSposition(float x, float y, GPSposition& target) const;
 
 	public:
-		PathPlanning(const ObstaclePoint* obstaclePoints, const int& currentNrOfObstacles, const VehicleState& vehicleState, VehicleStatus& vehicleStatus);
+		PathPlanning(const ObstaclePoint* obstacleSquaresOnGPU, const int& currentNrOfObstacles, const VehicleState& vehicleState, VehicleStatus& vehicleStatus);
 		~PathPlanning();
 
 		void updatePathAndControlSignals();
-		bool setMacroPath(const char* filePath);
+		void setMacroPath(const char* filePath);
 		const PathPointInLocalXY* getMicroPathXY() const;
 		const PathPointInLocalXY* getMacroPathXY() const;
 

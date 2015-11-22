@@ -167,19 +167,21 @@ bool PathPlanning::updatePathIndexes() {
 void PathPlanning::translateMacroPathToXY() {
 	// Translates all the coordinates in macroPathGPS to local x,y and stores them is macroPathXY.
 
-	int lengthOfMacroPathOnGPU = lengthOfMacroPath - currentIndexInMacroPath;
+	int lengthOfMacroPathOnGPU = lengthOfMacroPath - (currentIndexInMacroPath-1);
 
 	PathPointInGPScords* macroPathGPSOnGPU;
 	PathPointInLocalXY* macroPathXYOnGPU;
 
 	CUDA_CHECK_RETURN(cudaMalloc((void**)&macroPathGPSOnGPU,lengthOfMacroPathOnGPU*sizeof(PathPointInGPScords)));
 	CUDA_CHECK_RETURN(cudaMalloc((void**)&macroPathXYOnGPU,lengthOfMacroPathOnGPU*sizeof(PathPointInLocalXY)));
-	CUDA_CHECK_RETURN(cudaMemcpy(macroPathGPSOnGPU,macroPathGPS+currentIndexInMacroPath,lengthOfMacroPathOnGPU*sizeof(PathPointInGPScords),cudaMemcpyHostToDevice));
+
+	CUDA_CHECK_RETURN(cudaMemset(macroPathXYOnGPU,0,lengthOfMacroPathOnGPU*sizeof(PathPointInLocalXY)));
+	CUDA_CHECK_RETURN(cudaMemcpy(macroPathGPSOnGPU,macroPathGPS+(currentIndexInMacroPath-1),lengthOfMacroPathOnGPU*sizeof(PathPointInGPScords),cudaMemcpyHostToDevice));
 
 	int numberOfKernelBlocks = lengthOfMacroPathOnGPU/32+1;
 	translatePathToXY<<<numberOfKernelBlocks,32>>>(macroPathGPSOnGPU,macroPathXYOnGPU,lengthOfMacroPathOnGPU,vehicleState);
 
-	CUDA_CHECK_RETURN(cudaMemcpy(macroPathXY+currentIndexInMacroPath,macroPathXYOnGPU,lengthOfMacroPathOnGPU*sizeof(PathPointInLocalXY),cudaMemcpyDeviceToHost));
+	CUDA_CHECK_RETURN(cudaMemcpy(macroPathXY+(currentIndexInMacroPath-1),macroPathXYOnGPU,lengthOfMacroPathOnGPU*sizeof(PathPointInLocalXY),cudaMemcpyDeviceToHost));
 	CUDA_CHECK_RETURN(cudaFree(macroPathGPSOnGPU));
 	CUDA_CHECK_RETURN(cudaFree(macroPathXYOnGPU));
 
@@ -205,6 +207,7 @@ bool PathPlanning::translateMicroPathToXYandCheckIfMicroPathIsTooCloseToObstacle
 	CUDA_CHECK_RETURN(cudaMalloc((void**)&microPathGPSOnGPU,lengthOfMicroPathOnGPU*sizeof(PathPointInGPScords)));
 	CUDA_CHECK_RETURN(cudaMalloc((void**)&microPathXYOnGPU,lengthOfMicroPathOnGPU*sizeof(PathPointInGPScords)));
 
+	CUDA_CHECK_RETURN(cudaMemset(microPathXYOnGPU,0,lengthOfMicroPathOnGPU*sizeof(PathPointInLocalXY)));
 	CUDA_CHECK_RETURN(cudaMemset(isTooClosePointerOnGPU,0,sizeof(bool)));
 	CUDA_CHECK_RETURN(cudaMemcpy(microPathGPSOnGPU,microPathGPS+(currentIndexInMicroPath-1),lengthOfMicroPathOnGPU*sizeof(PathPointInGPScords),cudaMemcpyHostToDevice));
 
@@ -228,7 +231,7 @@ bool PathPlanning::translateMicroPathToXYandCheckIfMicroPathIsTooCloseToObstacle
 	return isToClose;
 }
 
-bool PathPlanning::setMacroPath(const char* filePath) {
+void PathPlanning::setMacroPath(const char* filePath) {
 	// Reset paths first
 	clearAllPaths(true);
 
@@ -237,15 +240,15 @@ bool PathPlanning::setMacroPath(const char* filePath) {
 	char line[60];
 
 	if ((fp = fopen(filePath,"rt"))  == NULL) {
-		printf("%s%s\n","Unable to open path file: ", strerror(errno));
-		return false;
+		printf("%s %s %s\n","Unable to open path file:",filePath, strerror(errno));
+		return;
 	}
 
 	while (fgets(line, 60, fp)) {if (*line!=35) {break;}} // Comment line, starting with '#'
 	sscanf(line,"%d",&lengthOfMacroPath);
 	if (lengthOfMacroPath<1) {
-		printf("%s\n","Path must be of length greater than zero");
-		return false;
+		printf("%s\n","Error: path must be of length greater than zero");
+		return;
 	}
 
 	lengthOfMacroPath++;
@@ -259,9 +262,9 @@ bool PathPlanning::setMacroPath(const char* filePath) {
 
 	for (int i=1;i<lengthOfMacroPath;i++) {
 		if (fgets(line,60,fp)==0) {
-			printf("%s\n","Not all coordinates in path are provided in path file");
+			printf("%s\n","Error: not all coordinates in path are provided in path file");
 			clearAllPaths(true);
-			return false;
+			return;
 		}
 		sscanf(line,"%lf %lf\n",&((macroPathGPS+i)->position.latc),&((macroPathGPS+i)->position.longc));
 		macroPathGPS[i].headingFromPrevPathPoint = getHeadingBetweenGPSpositions(macroPathGPS[i-1].position,macroPathGPS[i].position);
@@ -279,7 +282,7 @@ bool PathPlanning::setMacroPath(const char* filePath) {
 
 	fclose(fp);
 	vehicleStatus.macroPathHasBeenSet=true;
-	return true;
+	printf("%s\n","Path successfully loaded");
 }
 
 bool PathPlanning::generateMicroPath(float targetX, float targetY) {
@@ -487,6 +490,7 @@ const PathPointInLocalXY* PathPlanning::getMacroPathXY() const {
 
 // Hashtable:
 PathPlanning::HashTable::HashTable() {
+	memset(hashArray,0,sizeof(hashArray)); // Set hashArray to null
 }
 
 PathPlanning::HashTable::~HashTable() {
@@ -501,7 +505,7 @@ int PathPlanning::HashTable::getIndex(float x, float y) const {
 	return hash % HASH_TABLE_ENTRIES;
 }
 
-aStarNode* PathPlanning::HashTable::getAstarNode(float x, float y) const {
+PathPlanning::aStarNode* PathPlanning::HashTable::getAstarNode(float x, float y) const {
 	int arrayIndex = getIndex(x,y);
 	HashBucket* bucketPointer = *(hashArray + arrayIndex);
 
@@ -531,7 +535,7 @@ void PathPlanning::HashTable::clearHashTable() {
 }
 
 
-aStarNode *PathPlanning::HashTable::addAstarNode(float x, float y) {
+PathPlanning::aStarNode *PathPlanning::HashTable::addAstarNode(float x, float y) {
 	// First check if node already is in the hashtable
 	aStarNode* addedNode = getAstarNode(x,y);
 	if (addedNode != NULL) {return addedNode;}
@@ -591,7 +595,7 @@ void PathPlanning::MinHeap::bubbleNode(aStarNode* node) {
 	}
 }
 
-aStarNode* PathPlanning::MinHeap::popNode() {
+PathPlanning::aStarNode* PathPlanning::MinHeap::popNode() {
 	if (currentNrOfNodesInHeap==0) {return NULL;}
 	aStarNode *returnNode = heapArray[0], *tempNode;
 
@@ -682,8 +686,8 @@ namespace {
 			longc = (pathGPSOnGPU+myThreadID)->position.longc;
 			latc = (pathGPSOnGPU+myThreadID)->position.latc;
 
-			scaledX = (vehicleState.currentPosition.longc - longc) * LENGTH_OF_ONE_LONG_DEGREE_IN_METERS;
-			scaledY = (vehicleState.currentPosition.latc - latc) * LENGTH_OF_ONE_LAT_DEGREE_IN_METERS;
+			scaledX = (longc - vehicleState.currentPosition.longc) * LENGTH_OF_ONE_LONG_DEGREE_IN_METERS;
+			scaledY = (latc - vehicleState.currentPosition.latc) * LENGTH_OF_ONE_LAT_DEGREE_IN_METERS;
 			rotatedX = scaledX * cos(vehicleState.currentHeading) - scaledY * sin(vehicleState.currentHeading);
 			rotatedY = scaledX * sin(vehicleState.currentHeading) + scaledY * cos(vehicleState.currentHeading);
 			(pathXYonGPU+myThreadID)->x=rotatedX;

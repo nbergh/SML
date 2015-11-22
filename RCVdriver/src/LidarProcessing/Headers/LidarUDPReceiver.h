@@ -18,7 +18,7 @@ class LidarUDPReceiver {
 	void startReceiverThread();
 	void tryToReceiveLidarPacket();
 	bool isLidarPacket(const char* packet);
-	friend void* receiverThreadFunction(void *arg); // Thread function
+	static void* receiverThreadFunction(void *arg); // Thread function
 
 public:
 	LidarUDPReceiver(char* rawLidarData);

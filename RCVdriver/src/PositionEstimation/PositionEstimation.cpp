@@ -6,6 +6,10 @@
 
 PositionEstimation::PositionEstimation() {
 	vehicleState = new VehicleState;
+
+	// Very temp:
+	vehicleState->currentPosition.latc=59.35099;
+	vehicleState->currentPosition.longc=18.06800;
 }
 
 PositionEstimation::~PositionEstimation() {

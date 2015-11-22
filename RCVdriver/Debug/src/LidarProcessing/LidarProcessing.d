@@ -134,5 +134,5 @@ src/LidarProcessing.o : ../src/LidarProcessing/LidarProcessing.cu \
     /usr/include/stdint.h \
     /usr/include/x86_64-linux-gnu/bits/wchar.h \
     /usr/include/x86_64-linux-gnu/bits/in.h \
-    ../src/LidarProcessing/Headers/LidarCudaFunctions.h \
+    ../src/LidarProcessing/../Headers/Parameters.h \
     ../src/LidarProcessing/../Headers/CudaErrorCheckFunctions.h

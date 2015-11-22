@@ -14,7 +14,9 @@ class Input {
 	pthread_t parserThreadID;
 
 	void startParserThread();
-	friend void* parserThreadFunction(void* arg);
+	bool compareStrings (const char* string1, const char* string2, int lengthOfString);
+	void combineStrings (const char* string1,const char* string2, char* location, int maxLength);
+	static void* parserThreadFunction(void* arg);
 
 public:
 	Input(VehicleStatus& vehicleStatus, PathPlanning& pathPlanning);

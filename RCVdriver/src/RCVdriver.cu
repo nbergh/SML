@@ -31,15 +31,21 @@ void controllerMainLoopStep() {
 #include <stdio.h>
 int main(void)
 {
+	//Temp:
+	VehicleStatus vehicleStatus = {0};
+
 	// First initialize the main classes:
 	lidarProcessing = new LidarProcessing();
 	positionEstimation = new PositionEstimation();
-//	pathPlanning = new PathPlanning(lidarProcessing->getObstacleSquaresOnGPU(),);
-//	input = new Input(*pathPlanning);
+	pathPlanning = new PathPlanning(lidarProcessing->getObstacleSquaresOnGPU(),lidarProcessing->getCurrentNrOfObstacles(),positionEstimation->getCurrentVehicleState(),vehicleStatus);
+	input = new Input(vehicleStatus,*pathPlanning);
+
+	//Temp:
+	for (int i=0;i<1000;i++) {controllerMainLoopStep();}
 
 	// Set the controllerMainLoopStep to execute periodically:
-
 	sleep(100000);
+
 
 	//startGraphics(lidarProcessing->getLidarDataPoints(),lidarProcessing->getObstacleSquares(),lidarProcessing->getCurrentNrOfObstacles(),GRAPHICS_UPDATE_RATE);
 

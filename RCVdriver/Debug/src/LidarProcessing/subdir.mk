@@ -7,18 +7,12 @@ CPP_SRCS += \
 ../src/LidarProcessing/LidarUDPReceiver.cpp 
 
 CU_SRCS += \
-../src/LidarProcessing/CudaFunctionsForIdentifyingObstacles.cu \
-../src/LidarProcessing/CudaFunctionsForTranslatingLidarData.cu \
 ../src/LidarProcessing/LidarProcessing.cu 
 
 CU_DEPS += \
-./src/LidarProcessing/CudaFunctionsForIdentifyingObstacles.d \
-./src/LidarProcessing/CudaFunctionsForTranslatingLidarData.d \
 ./src/LidarProcessing/LidarProcessing.d 
 
 OBJS += \
-./src/LidarProcessing/CudaFunctionsForIdentifyingObstacles.o \
-./src/LidarProcessing/CudaFunctionsForTranslatingLidarData.o \
 ./src/LidarProcessing/LidarProcessing.o \
 ./src/LidarProcessing/LidarUDPReceiver.o 
 
