@@ -301,14 +301,20 @@ bool PathPlanning::generateMicroPath(float targetX, float targetY) {
 		baseNode->isOnClosedSet=true;
 		baseNode->isOnOpenSet=false;
 
-		if (baseNode->x == targetNode->x && baseNode->y == targetNode->y) {break;} // Path found
+		if (baseNode==targetNode) {break;} // Path found
 
-		if (minHeap->getAvailableSpace() < 20) {return false;} //Minheap is full, and path cannot be found
+		if (minHeap->getAvailableSpace() < 20) {
+			return false;
+		} //Minheap is full, and path cannot be found
+
 		for (int i=0;i<14;i++) {
 			discoverNeighbor(baseNode,targetNode,i);
 		}
 		baseNode = minHeap->popNode();
-		if (baseNode==NULL) {return false;} // MinHeap is empty, so no path could be found
+		if (baseNode==NULL) {
+			return false;
+		} // MinHeap is empty, so no path could be found
+
 	}
 
 	// Path found, now create microPathGPS and microPathXY
@@ -360,28 +366,28 @@ void PathPlanning::discoverNeighbor(const aStarNode *baseNode, const aStarNode *
 	 */
 	aStarNode* neighborNode;
 
-	const float stepDistance=GROUND_GRID_RESOLUTION; // The stepping distance between each point in the path
+	float stepDistance=GROUND_GRID_RESOLUTION; // The stepping distance between each point in the path
 	double deltaAngle,neighborLocalPathAngleFromPreviousNode;
 	switch(index) {
 		// Going forward:
 		case 0: {deltaAngle=0+(baseNode->pathIsReversingFromPrevNode ? M_PI : 0);break;}
-		case 1: {deltaAngle=0.1+(baseNode->pathIsReversingFromPrevNode ? M_PI : 0);break;}
-		case 2: {deltaAngle=0.2+(baseNode->pathIsReversingFromPrevNode ? M_PI : 0);break;}
-		case 3: {deltaAngle=0.4+(baseNode->pathIsReversingFromPrevNode ? M_PI : 0);break;}
-		case 4: {deltaAngle=-0.1+(baseNode->pathIsReversingFromPrevNode ? M_PI : 0);break;}
-		case 5: {deltaAngle=-0.2+(baseNode->pathIsReversingFromPrevNode ? M_PI : 0);break;}
-		case 6: {deltaAngle=-0.4+(baseNode->pathIsReversingFromPrevNode ? M_PI : 0);break;}
+		case 1: {deltaAngle=0.1+(baseNode->pathIsReversingFromPrevNode ? M_PI : 0);stepDistance*=11;break;}
+		case 2: {deltaAngle=0.2+(baseNode->pathIsReversingFromPrevNode ? M_PI : 0);stepDistance*=6;break;}
+		case 3: {deltaAngle=0.4+(baseNode->pathIsReversingFromPrevNode ? M_PI : 0);stepDistance*=3;break;}
+		case 4: {deltaAngle=-0.1+(baseNode->pathIsReversingFromPrevNode ? M_PI : 0);stepDistance*=11;break;}
+		case 5: {deltaAngle=-0.2+(baseNode->pathIsReversingFromPrevNode ? M_PI : 0);stepDistance*=6;break;}
+		case 6: {deltaAngle=-0.4+(baseNode->pathIsReversingFromPrevNode ? M_PI : 0);stepDistance*=3;break;}
 		// Reversing:
 		case 7: {deltaAngle=0+(baseNode->pathIsReversingFromPrevNode ? 0 : M_PI);break;}
-		case 8: {deltaAngle=0.1+(baseNode->pathIsReversingFromPrevNode ? 0 : M_PI);break;}
-		case 9: {deltaAngle=0.2+(baseNode->pathIsReversingFromPrevNode ? 0 : M_PI);break;}
-		case 10: {deltaAngle=0.4+(baseNode->pathIsReversingFromPrevNode ? 0 : M_PI);break;}
-		case 11: {deltaAngle=-0.1+(baseNode->pathIsReversingFromPrevNode ? 0 : M_PI);break;}
-		case 12: {deltaAngle=-0.2+(baseNode->pathIsReversingFromPrevNode ? 0 : M_PI);break;}
-		case 13: {deltaAngle=-0.4+(baseNode->pathIsReversingFromPrevNode ? 0 : M_PI);break;}
+		case 8: {deltaAngle=0.1+(baseNode->pathIsReversingFromPrevNode ? 0 : M_PI);stepDistance*=11;break;}
+		case 9: {deltaAngle=0.2+(baseNode->pathIsReversingFromPrevNode ? 0 : M_PI);stepDistance*=6;break;}
+		case 10: {deltaAngle=0.4+(baseNode->pathIsReversingFromPrevNode ? 0 : M_PI);stepDistance*=3;break;}
+		case 11: {deltaAngle=-0.1+(baseNode->pathIsReversingFromPrevNode ? 0 : M_PI);stepDistance*=11;break;}
+		case 12: {deltaAngle=-0.2+(baseNode->pathIsReversingFromPrevNode ? 0 : M_PI);stepDistance*=6;break;}
+		case 13: {deltaAngle=-0.4+(baseNode->pathIsReversingFromPrevNode ? 0 : M_PI);stepDistance*=3;break;}
 	}
 	neighborLocalPathAngleFromPreviousNode = baseNode->localPathAngleFromPreviousNode + deltaAngle;
-	/* LocalPathAngleFromPreviousNode is the angle going from {the vector going from baseNode to nehgborNode}
+	/* LocalPathAngleFromPreviousNode is the angle going from {the vector going from baseNode to neihgborNode}
 	 * to {the vehicle centerline vector pointing forwards}. It is local in the coordinate system of the vehicle
 	 */
 
@@ -390,8 +396,8 @@ void PathPlanning::discoverNeighbor(const aStarNode *baseNode, const aStarNode *
 
 	// The coordinates of the neighbor node, the values rounded to match the obstacleMatrixResolution in the grid:
 	float neighborX,neighborY;
-	neighborX = baseNode->x + round(stepDistance * cos(neighborLocalPathAngleFromPreviousNode)/GROUND_GRID_RESOLUTION)*GROUND_GRID_RESOLUTION;
-	neighborY = baseNode->y + round(stepDistance * sin(neighborLocalPathAngleFromPreviousNode)/GROUND_GRID_RESOLUTION)*GROUND_GRID_RESOLUTION;
+	neighborY = baseNode->y + stepDistance * cos(neighborLocalPathAngleFromPreviousNode); // y is the longitudinal axis in the vehicle local cordsys
+	neighborX = baseNode->x + stepDistance * sin(neighborLocalPathAngleFromPreviousNode);
 
 	neighborNode = hashTable->addAstarNode(neighborX,neighborY); // Gets the neighborNode from the hashTable, or adds it if it hasn't been visited
 
@@ -409,8 +415,6 @@ void PathPlanning::discoverNeighbor(const aStarNode *baseNode, const aStarNode *
 	neighbourHeuristic += sqrt((neighborNode->x-targetNode->x)*(neighborNode->x-targetNode->x)+(neighborNode->y-targetNode->y)*(neighborNode->y-targetNode->y));
 
 	if (!neighborNode->isOnOpenSet) {
-		if(!minHeap->addNode(neighborNode)) {return;} // Minheap is full, however this should never happen, since that is being checked in generateMicroPath before calling this function
-
 		// Node has not been discovered yet
 		neighborNode->isOnOpenSet=true;
 
@@ -420,6 +424,8 @@ void PathPlanning::discoverNeighbor(const aStarNode *baseNode, const aStarNode *
 		neighborNode->previousNodeInPath = baseNode;
 		if (index<7) {neighborNode->pathIsReversingFromPrevNode=false;}
 		else {neighborNode->pathIsReversingFromPrevNode=true;}
+
+		if(!minHeap->addNode(neighborNode)) {return;} // Minheap is full, however this should never happen, since that is being checked in generateMicroPath before calling this function
 	}
 	else if (neighborDistanceFromStartNode < neighborNode->distanceFromStartNode) {
 		neighborNode->distanceFromStartNode = neighborDistanceFromStartNode;
@@ -497,26 +503,14 @@ PathPlanning::HashTable::~HashTable() {
 	clearHashTable();
 }
 
-int PathPlanning::HashTable::getIndex(float x, float y) const {
+int PathPlanning::HashTable::getIndex(int gridX, int gridY) const {
 	// I tested this hasher in matlab, it is based on Java's hashCode(), and it gives pretty even results with GROUND_GRID_RESOLUTION
 	// between 0.01 and 0.2. X and Y are at this point always aligned with the ground grid
 
-	int hash =100*abs(x)+100*abs(y)*abs(y);
+	int hash = 999*abs(gridX)+998*abs(gridY)*abs(gridY);
 	return hash % HASH_TABLE_ENTRIES;
 }
 
-PathPlanning::aStarNode* PathPlanning::HashTable::getAstarNode(float x, float y) const {
-	int arrayIndex = getIndex(x,y);
-	HashBucket* bucketPointer = *(hashArray + arrayIndex);
-
-	while(true) {
-		if (bucketPointer==NULL) {break;} //No bucket was found matching x and y
-		else if (bucketPointer->node.x==x && bucketPointer->node.y==y) {return &bucketPointer->node;}
-
-		bucketPointer=bucketPointer->nextBucket;
-	}
-	return NULL;
-}
 
 void PathPlanning::HashTable::clearBucketList(HashBucket* bucket) const {
 	// Deletes every entry in the bucket linked-list
@@ -535,14 +529,25 @@ void PathPlanning::HashTable::clearHashTable() {
 }
 
 
-PathPlanning::aStarNode *PathPlanning::HashTable::addAstarNode(float x, float y) {
-	// First check if node already is in the hashtable
-	aStarNode* addedNode = getAstarNode(x,y);
-	if (addedNode != NULL) {return addedNode;}
+PathPlanning::aStarNode* PathPlanning::HashTable::addAstarNode(float x, float y) {
+	// gridX and gridY are the rounded coordinates that match the ground grid resolution
+	int gridX = x/GROUND_GRID_RESOLUTION, gridY = y/GROUND_GRID_RESOLUTION, otherGridX,otherGridY;
+	int arrayIndex = getIndex(gridX,gridY);
 
-	int arrayIndex = getIndex(x,y); // The index in the hashArray where the node is supposed to go
+	// First check if node already is in the hashtable:
+	HashBucket* bucketPointer = hashArray[arrayIndex];
+	while(true) {
+		if (bucketPointer==NULL) {break;} //No bucket was found matching x and y
 
-	HashBucket* bucketPointer=hashArray[arrayIndex];
+		otherGridX = bucketPointer->node.x/GROUND_GRID_RESOLUTION;
+		otherGridY = bucketPointer->node.y/GROUND_GRID_RESOLUTION;
+		if (gridX == otherGridX && gridY == otherGridY) {return &bucketPointer->node;}
+
+		bucketPointer=bucketPointer->nextBucket;
+	}
+	// No match was found in the hashtable; add new node
+
+	bucketPointer=hashArray[arrayIndex];
 	if (bucketPointer==NULL) {
 		hashArray[arrayIndex]=new HashBucket(); //Everything (including all the fields of the aStarNode) set to zero
 		bucketPointer=hashArray[arrayIndex];
@@ -553,8 +558,8 @@ PathPlanning::aStarNode *PathPlanning::HashTable::addAstarNode(float x, float y)
 		bucketPointer = bucketPointer->nextBucket;
 	}
 
-	bucketPointer->node.x=x;
-	bucketPointer->node.y=y;
+	bucketPointer->node.x=gridX*GROUND_GRID_RESOLUTION;
+	bucketPointer->node.y=gridY*GROUND_GRID_RESOLUTION;
 	return &bucketPointer->node;
 }
 
@@ -573,12 +578,12 @@ void PathPlanning::MinHeap::clearMinHeap() {
 bool PathPlanning::MinHeap::addNode(aStarNode* node) {
 	if (currentNrOfNodesInHeap==HEAP_SIZE) {return false;} // Return false if heap is full; meaning that no path can be generated
 
-	currentNrOfNodesInHeap++;
 	heapArray[currentNrOfNodesInHeap] = node;
 	node->heapArrayIndex = currentNrOfNodesInHeap;
 
 	bubbleNode(node);
 
+	currentNrOfNodesInHeap++;
 	return true;
 }
 
@@ -590,6 +595,8 @@ void PathPlanning::MinHeap::bubbleNode(aStarNode* node) {
 
 		// Switch position with parent
 		heapArray[node->heapArrayIndex] = heapArray[(node->heapArrayIndex-1)/2]; // Put parent in my position in the heapArray
+		heapArray[node->heapArrayIndex]->heapArrayIndex = node->heapArrayIndex; // Update parent heapArrayIndex
+
 		heapArray[(node->heapArrayIndex-1)/2]=node; // Put me in my parents position
 		node->heapArrayIndex = (node->heapArrayIndex-1)/2; // Update my heapArrayIndex
 	}
@@ -599,13 +606,15 @@ PathPlanning::aStarNode* PathPlanning::MinHeap::popNode() {
 	if (currentNrOfNodesInHeap==0) {return NULL;}
 	aStarNode *returnNode = heapArray[0], *tempNode;
 
+	currentNrOfNodesInHeap--;
 	heapArray[0] = heapArray[currentNrOfNodesInHeap];
 	heapArray[currentNrOfNodesInHeap]->heapArrayIndex=0;
-	currentNrOfNodesInHeap--;
 
 	int currentNodeIndex=0,childNodeIndex;
 	double childHeuristics;
 	while (true) {
+		// Bubble down
+
 		// Find the smallest of the two children and swap the current node with them if their heuristics are smaller than the current node
 		if (2*currentNodeIndex +1 >= currentNrOfNodesInHeap) {break;} // currentNode has no children
 
@@ -652,15 +661,28 @@ namespace {
 		rotatedObstacleX = abs(obstacleX * cos(localPathAngleFromPreviousNode) - obstacleY * sin(localPathAngleFromPreviousNode));
 		rotatedObstacleY = abs(obstacleX * sin(localPathAngleFromPreviousNode) + obstacleY * cos(localPathAngleFromPreviousNode));
 
-		if (rotatedObstacleX>RCV_WIDTH/2 && rotatedObstacleY>RCV_LENGTH/2) {
-			// minDistanceToObstacle is defined by the distance from {RCV_WIDTH/2,RCV_LENGHT/2} to the obstacle point
-			minDistanceToObstacle = sqrt((rotatedObstacleX-RCV_WIDTH/2)*(rotatedObstacleX-RCV_WIDTH/2)+(rotatedObstacleY-RCV_HEIGHT/2)*(rotatedObstacleY-RCV_HEIGHT/2));
+		if (rotatedObstacleX>RCV_WIDTH/2.0 && rotatedObstacleY>RCV_LENGTH/2.0) {
+			// minDistanceToObstacle is defined by the distance from {RCV_WIDTH/2.0,RCV_LENGHT/2.0} to the obstacle point
+			minDistanceToObstacle = sqrt((rotatedObstacleX-RCV_WIDTH/2.0)*(rotatedObstacleX-RCV_WIDTH/2.0)+(rotatedObstacleY-RCV_HEIGHT/2.0)*(rotatedObstacleY-RCV_HEIGHT/2.0));
 		}
-		else if (rotatedObstacleX > RCV_WIDTH/2) {minDistanceToObstacle = rotatedObstacleX - RCV_WIDTH/2;}
-		else if (rotatedObstacleY > RCV_LENGTH/2) {minDistanceToObstacle = rotatedObstacleY - RCV_LENGTH/2;}
+		else if (rotatedObstacleX > RCV_WIDTH/2.0) {minDistanceToObstacle = rotatedObstacleX - RCV_WIDTH/2.0;}
+		else if (rotatedObstacleY > RCV_LENGTH/2.0) {minDistanceToObstacle = rotatedObstacleY - RCV_LENGTH/2.0;}
 		else {minDistanceToObstacle=-1;} // Obstacle is inside the space defined by the vehicle
 
-		if (minDistanceToObstacle < OBSTACLE_SAFETY_DISTANCE) {return true;}
+		float px,py,ox,oy,rox,roy,angle;
+
+		if (minDistanceToObstacle < OBSTACLE_SAFETY_DISTANCE) {
+			px = pathPointX;
+			py = pathPointY;
+			ox = obstacleX;
+			oy = obstacleY;
+			rox = rotatedObstacleX;
+			roy = rotatedObstacleY;
+			angle = localPathAngleFromPreviousNode;
+
+			return true;
+		}
+
 		return false;
 	}
 

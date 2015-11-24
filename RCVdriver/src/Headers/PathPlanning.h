@@ -3,8 +3,8 @@
 
 #include "Structs.h"
 
-#define HEAP_SIZE 5000 // The heap has limited space
-#define HASH_TABLE_ENTRIES 5000 // The hash table has unlimited space, but a limited number of possible hashes
+#define HEAP_SIZE 100000 // The heap has limited space
+#define HASH_TABLE_ENTRIES 100000 // The hash table has unlimited space, but a limited number of possible hashes
 
 class PathPlanning {
 	struct aStarNode {
@@ -32,8 +32,7 @@ class PathPlanning {
 
 		HashBucket* hashArray[HASH_TABLE_ENTRIES]; // An array of hashBucket pointers
 
-		int getIndex(float x, float y) const;
-		aStarNode *getAstarNode(float x, float y) const;
+		int getIndex(int gridX, int gridY) const;
 		void clearBucketList(HashBucket* bucket) const;
 
 		public:
