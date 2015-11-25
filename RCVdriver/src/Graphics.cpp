@@ -1,15 +1,47 @@
 #include <GL/freeglut.h>
 #include <math.h>
+#include <stdio.h>
+#include <errno.h>
+#include <string.h>
 
 #include "Headers/Parameters.h"
 #include "Headers/Structs.h"
+#include "Headers/Graphics.h"
 
-/* This cpp file would normally be represented as a class, however the callback functions for glut (drawDisplay,
- * handleKeyDown, handleKeyUp, handleMouseClick, handleMouseMove, updateFrame and updateController) cannot be
- * members of a class; since glut doesn't permit member functions to be registered as callbacks (glut is developed
- * for C that doesn't have classes). To get around that problem, this file is not a class, but a collection of
- * functions and some translation-unit scope pointers, where startGraphics is like the constructor
- */
+// This class does all the graphics used by RCVdriver
+
+
+Graphics::Graphics() {
+	startGraphicsThread();
+}
+
+Graphics::~Graphics() {
+	// Stop the thread and wait for it to exit
+	stopGraphicsThread=true;
+	pthread_join(graphicsThreadID,NULL);
+}
+
+void Graphics::startGraphicsThread() {
+	stopGraphicsThread=false;
+
+	//Start the receiver thread
+	if(pthread_create(&graphicsThreadID,NULL,graphicsThreadFunction,this)) {
+		printf("%s%s\n","Unable to create thread: ", strerror(errno));
+		exit(-1);
+	}
+}
+
+void* Graphics::graphicsThreadFunction(void* arg) {
+	Graphics* thisPointer = (Graphics*)arg;
+
+	bool& stopGraphicsThread = thisPointer->stopGraphicsThread;
+
+
+
+	printf("%s\n","Graphics thread exited");
+	pthread_exit(NULL);
+}
+
 
 namespace { // Graphics namespace
 	struct CameraPosition {
@@ -34,9 +66,8 @@ namespace { // Graphics namespace
 	void handleKeyUp(unsigned char key, int x, int y);
 	void handleMouseMove(int x, int y);
 	void handleMouseClick(int button, int state, int x, int y);
-	void updateFrame(int frameRate);
+	void updateFrame(int arg);
 	void drawDisplay(void);
-	void setUpDisplay();
 
 	CameraPosition* cameraPosition;
 	KeysAndMouseState* keysAndMouseState;
@@ -44,7 +75,7 @@ namespace { // Graphics namespace
 	ObstaclePoint* obstacleSquares;
 	int currentNrOfObstacles;
 
-	void startGraphics(const LidarDataPoint* lidarDataPoints, const ObstaclePoint* obstacleSquares, const int& currentNrOfObstacles, const int frameRate) {
+	void startGraphics(const LidarDataPoint* lidarDataPoints, const ObstaclePoint* obstacleSquares, const int& currentNrOfObstacles) {
 		keysAndMouseState = new KeysAndMouseState();
 		cameraPosition = new CameraPosition();
 		cameraPosition->z = 5; // Set camera position to start at z=5
@@ -55,10 +86,7 @@ namespace { // Graphics namespace
 		glutInitWindowPosition(0,0);
 		glutInitWindowSize(1000,1000);
 		glutCreateWindow("Lidar 3D visualization");
-		glutFullScreen();
-
-		// Set up the openGL projection matrix
-		setUpDisplay();
+//		glutFullScreen();
 
 		// Register callbacks
 		glutDisplayFunc(drawDisplay);
@@ -71,6 +99,11 @@ namespace { // Graphics namespace
 		// Set glut and opengl options:
 		glutSetOption(GLUT_ACTION_ON_WINDOW_CLOSE,GLUT_ACTION_GLUTMAINLOOP_RETURNS);
 		glEnable(GL_DEPTH_TEST);
+
+		// Set up the openGL projection matrix
+		glMatrixMode(GL_PROJECTION);glLoadIdentity(); // Load the Projection Matrix
+		glViewport(0, 0, glutGet(GLUT_SCREEN_WIDTH), glutGet(GLUT_SCREEN_HEIGHT)); 	// Set the viewport to be the entire window
+		gluPerspective(45.0f, glutGet(GLUT_SCREEN_WIDTH)/(double) glutGet(GLUT_SCREEN_HEIGHT), 0.1f, 100.0f); // Set the correct perspective.
 
 		// Enter GLUT event processing cycle
 		glutMainLoop();
@@ -181,9 +214,9 @@ namespace { // Graphics namespace
 		}
 	}
 
-	void updateFrame(int frameRate) {
+	void updateFrame(int arg) {
 		// Very simple frame updater function, just registeres a callback to itself, and tells openGL to call drawDisplay as soon as possible
-		glutTimerFunc(1000/frameRate,updateFrame,frameRate); // Call again in 1000/FRAMERATE milliseconds
+		glutTimerFunc(1000.0/GRAPHICS_FRAME_RATE,updateFrame,0);
 
 		float timeSinceLastCall=0.01;
 		updateCameraPositionAccordingToKeys(timeSinceLastCall);
@@ -221,14 +254,5 @@ namespace { // Graphics namespace
 
 		//glFlush();
 		glutSwapBuffers();
-	}
-
-	void setUpDisplay() {
-		// Load the Projection Matrix
-		glMatrixMode(GL_PROJECTION);glLoadIdentity();
-		// Set the viewport to be the entire window
-		glViewport(0, 0, glutGet(GLUT_SCREEN_WIDTH), glutGet(GLUT_SCREEN_HEIGHT));
-		// Set the correct perspective.
-		gluPerspective(45.0f, glutGet(GLUT_SCREEN_WIDTH)/(double) glutGet(GLUT_SCREEN_HEIGHT), 0.1f, 100.0f);
 	}
 }

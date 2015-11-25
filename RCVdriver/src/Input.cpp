@@ -7,7 +7,8 @@
 
 Input::Input(VehicleStatus& vehicleStatus, PathPlanning& pathPlanning):
 		vehicleStatus(vehicleStatus),
-		pathPlanning(pathPlanning) {
+		pathPlanning(pathPlanning),
+		stopMainControllerLoop(false) {
 	startParserThread();
 }
 
@@ -82,6 +83,11 @@ void* Input::parserThreadFunction(void* arg) {
 			vehicleStatus.isRunning=false;
 			continue;
 		}
+		if (thisPointer->compareStrings(inputCommand,"exit",4)) {
+			printf("%s\n","Program exiting");
+			thisPointer->stopMainControllerLoop=true;
+			break;
+		}
 
 		printf("%s%s","Unknown command: ",inputCommand);
 	}
@@ -90,14 +96,8 @@ void* Input::parserThreadFunction(void* arg) {
 	pthread_exit(NULL);
 }
 
-
-
-
-
-
-
-
-
-
+bool Input::getStopMainControllerLoop() {
+	return stopMainControllerLoop;
+}
 
 

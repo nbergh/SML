@@ -99,8 +99,6 @@ void PathPlanning::updatePathAndControlSignals() {
 
 bool PathPlanning::updatePathIndexes() {
 	// This function updates currentIndexInMicroPath and currentIndexInMacroPath based on the current vehicle position
-	if (lengthOfMicroPath==0) {return false;} //MicroPath hasn't been set yet, so return
-
 	double currentPathAngle;
 	float vehicleDeltaLatFromPrevGPSpoint,vehicleDeltaLongFromPrevGPSpoint,gpsPointDeltaLatFromPrevGPSpoint,gpsPointDeltaLongFromPrevGPSpoint,vehicleRotatedY,gpsPointRotatedY;
 	while(true) {
@@ -297,6 +295,7 @@ bool PathPlanning::generateMicroPath(float targetX, float targetY) {
 	minHeap->clearMinHeap();
 
 	aStarNode *baseNode = hashTable->addAstarNode(0,0), *targetNode = hashTable->addAstarNode(targetX,targetY);
+
 	while (true) {
 		baseNode->isOnClosedSet=true;
 		baseNode->isOnOpenSet=false;
@@ -331,14 +330,14 @@ bool PathPlanning::generateMicroPath(float targetX, float targetY) {
 	microPathXY = new PathPointInLocalXY[lengthOfMicroPath]();
 
 	// Add the start node to the first position in the path
-	translateLocalXYtoGPSposition(currentNode->x,currentNode->y,microPathGPS[0].position);
+	microPathGPS[0].position=vehicleState.currentPosition; // TODO maybe pass this as a parameter
 	microPathXY[0].x=0;
 	microPathXY[0].y=0;
 
 	currentNode = targetNode;
 	for (int i=lengthOfMicroPath-1;i>0;i--) {
 		translateLocalXYtoGPSposition(currentNode->x,currentNode->y,microPathGPS[i].position);
-		microPathGPS[i].headingFromPrevPathPoint = vehicleState.currentHeading - currentNode->localPathAngleFromPreviousNode;
+		microPathGPS[i].headingFromPrevPathPoint = vehicleState.currentHeading + currentNode->localPathAngleFromPreviousNode;
 		microPathGPS[i].latDistanceFromPrevPathPoint = rotateAndGetY(currentNode->x-currentNode->previousNodeInPath->x,currentNode->y-currentNode->previousNodeInPath->y,vehicleState.currentHeading);
 		microPathGPS[i].longDistanceFromPrevPathPoint = rotateAndGetX(currentNode->x-currentNode->previousNodeInPath->x,currentNode->y-currentNode->previousNodeInPath->y,vehicleState.currentHeading);
 		microPathGPS[i].isReversingFromPrevNode = currentNode->pathIsReversingFromPrevNode;
@@ -367,7 +366,7 @@ void PathPlanning::discoverNeighbor(const aStarNode *baseNode, const aStarNode *
 	aStarNode* neighborNode;
 
 	float stepDistance=GROUND_GRID_RESOLUTION; // The stepping distance between each point in the path
-	double deltaAngle,neighborLocalPathAngleFromPreviousNode;
+	double deltaAngle,directionAngle,neighborLocalPathAngleFromPreviousNode;
 	switch(index) {
 		// Going forward:
 		case 0: {deltaAngle=0+(baseNode->pathIsReversingFromPrevNode ? M_PI : 0);break;}
@@ -386,20 +385,17 @@ void PathPlanning::discoverNeighbor(const aStarNode *baseNode, const aStarNode *
 		case 12: {deltaAngle=-0.2+(baseNode->pathIsReversingFromPrevNode ? 0 : M_PI);stepDistance*=6;break;}
 		case 13: {deltaAngle=-0.4+(baseNode->pathIsReversingFromPrevNode ? 0 : M_PI);stepDistance*=3;break;}
 	}
-	neighborLocalPathAngleFromPreviousNode = baseNode->localPathAngleFromPreviousNode + deltaAngle;
-	/* LocalPathAngleFromPreviousNode is the angle going from {the vector going from baseNode to neihgborNode}
-	 * to {the vehicle centerline vector pointing forwards}. It is local in the coordinate system of the vehicle
+	directionAngle = baseNode->localPathAngleFromPreviousNode + deltaAngle;
+
+	neighborNode = hashTable->addAstarNode((baseNode->x + stepDistance * sin(directionAngle)),(baseNode->y + stepDistance * cos(directionAngle)));
+	// Adds the new node to the hashtable, or gets it if it's already there. The y-axis goes along the vehicle longitudinal centerline
+
+	neighborLocalPathAngleFromPreviousNode = baseNode->localPathAngleFromPreviousNode + atan2(neighborNode->x-baseNode->x,neighborNode->y-baseNode->y);
+	/* LocalPathAngleFromPreviousNode is the angle going from {the vehicle centerline vector pointing forwards}
+	 * to {the vector going from baseNode to neihgborNode}. It is local in the coordinate system of the vehicle
 	 */
-
-	if (neighborLocalPathAngleFromPreviousNode < -M_PI) {neighborLocalPathAngleFromPreviousNode+=2*M_PI;}
 	if (neighborLocalPathAngleFromPreviousNode > M_PI) {neighborLocalPathAngleFromPreviousNode-=2*M_PI;}
-
-	// The coordinates of the neighbor node, the values rounded to match the obstacleMatrixResolution in the grid:
-	float neighborX,neighborY;
-	neighborY = baseNode->y + stepDistance * cos(neighborLocalPathAngleFromPreviousNode); // y is the longitudinal axis in the vehicle local cordsys
-	neighborX = baseNode->x + stepDistance * sin(neighborLocalPathAngleFromPreviousNode);
-
-	neighborNode = hashTable->addAstarNode(neighborX,neighborY); // Gets the neighborNode from the hashTable, or adds it if it hasn't been visited
+	if (neighborLocalPathAngleFromPreviousNode < -M_PI) {neighborLocalPathAngleFromPreviousNode+=2*M_PI;}
 
 	if (neighborNode->isOnClosedSet || checkIfaStarNodeIsTooCloseToObstacles(*neighborNode,neighborLocalPathAngleFromPreviousNode)) {return;}
 	// If neigborNode is on closed set, or if it is too close to an obstacle, ignore it and return
@@ -477,6 +473,7 @@ void PathPlanning::translateLocalXYtoGPSposition(float x, float y, GPSposition& 
 	 * and y counter clockwise by heading makes y align with true north, and x align with true east.
 	 * Scale those and you get latc and longc
 	 */
+
 	float rotatedX = rotateAndGetX(x,y,-vehicleState.currentHeading);
 	float rotatedY = rotateAndGetY(x,y,-vehicleState.currentHeading);
 
@@ -539,8 +536,8 @@ PathPlanning::aStarNode* PathPlanning::HashTable::addAstarNode(float x, float y)
 	while(true) {
 		if (bucketPointer==NULL) {break;} //No bucket was found matching x and y
 
-		otherGridX = bucketPointer->node.x/GROUND_GRID_RESOLUTION;
-		otherGridY = bucketPointer->node.y/GROUND_GRID_RESOLUTION;
+		otherGridX = round(bucketPointer->node.x/GROUND_GRID_RESOLUTION);
+		otherGridY = round(bucketPointer->node.y/GROUND_GRID_RESOLUTION);
 		if (gridX == otherGridX && gridY == otherGridY) {return &bucketPointer->node;}
 
 		bucketPointer=bucketPointer->nextBucket;
@@ -658,8 +655,8 @@ namespace {
 		 */
 		obstacleX = obstacleX - pathPointX;
 		obstacleY = obstacleY - pathPointY;
-		rotatedObstacleX = abs(obstacleX * cos(localPathAngleFromPreviousNode) - obstacleY * sin(localPathAngleFromPreviousNode));
-		rotatedObstacleY = abs(obstacleX * sin(localPathAngleFromPreviousNode) + obstacleY * cos(localPathAngleFromPreviousNode));
+		rotatedObstacleX = abs(obstacleX * cos(-localPathAngleFromPreviousNode) - obstacleY * sin(-localPathAngleFromPreviousNode));
+		rotatedObstacleY = abs(obstacleX * sin(-localPathAngleFromPreviousNode) + obstacleY * cos(-localPathAngleFromPreviousNode));
 
 		if (rotatedObstacleX>RCV_WIDTH/2.0 && rotatedObstacleY>RCV_LENGTH/2.0) {
 			// minDistanceToObstacle is defined by the distance from {RCV_WIDTH/2.0,RCV_LENGHT/2.0} to the obstacle point
@@ -669,16 +666,16 @@ namespace {
 		else if (rotatedObstacleY > RCV_LENGTH/2.0) {minDistanceToObstacle = rotatedObstacleY - RCV_LENGTH/2.0;}
 		else {minDistanceToObstacle=-1;} // Obstacle is inside the space defined by the vehicle
 
-		float px,py,ox,oy,rox,roy,angle;
+//		float px,py,ox,oy,rox,roy,angle;
 
 		if (minDistanceToObstacle < OBSTACLE_SAFETY_DISTANCE) {
-			px = pathPointX;
-			py = pathPointY;
-			ox = obstacleX;
-			oy = obstacleY;
-			rox = rotatedObstacleX;
-			roy = rotatedObstacleY;
-			angle = localPathAngleFromPreviousNode;
+//			px = pathPointX;
+//			py = pathPointY;
+//			ox = obstacleX;
+//			oy = obstacleY;
+//			rox = rotatedObstacleX;
+//			roy = rotatedObstacleY;
+//			angle = localPathAngleFromPreviousNode;
 
 			return true;
 		}
@@ -732,7 +729,7 @@ namespace {
 			// The positions of the nodes and obstacles are the center distances of their respective square
 			pathPointX = (pathXYonGPU+myPathIndex)->x + GROUND_GRID_RESOLUTION/2.0;
 			pathPointY = (pathXYonGPU+myPathIndex)->y + GROUND_GRID_RESOLUTION/2.0;
-			localPathAngleFromPreviousNode = vehicleState.currentHeading - (pathGPSOnGPU+myPathIndex)->headingFromPrevPathPoint;
+			localPathAngleFromPreviousNode = (pathGPSOnGPU+myPathIndex)->headingFromPrevPathPoint - vehicleState.currentHeading;
 
 			obstacleX = (obstacleSquaresOnGPU + 4*myObstacleIndex)->x +GROUND_GRID_RESOLUTION/2.0;
 			obstacleY = (obstacleSquaresOnGPU + 4*myObstacleIndex)->y +GROUND_GRID_RESOLUTION/2.0;

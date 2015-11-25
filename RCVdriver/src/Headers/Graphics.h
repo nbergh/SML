@@ -1,9 +1,19 @@
 #ifndef GRAPHICS_H_
 #define GRAPHICS_H_
 
-// This header contains a function for creating a window and displaying the lidar point cloud
+#include <pthread.h>
 
-void startGraphics(const LidarDataPoint* lidarDataPoints, const ObstaclePoint* obstacleSquares, const int& currentNrOfObstacles, const int frameRate);
-// Starts the glut main loop, and doesn't return until the program is exited by pressing 'q'
+class Graphics {
+	bool stopGraphicsThread;
+	pthread_t graphicsThreadID;
+
+	void startGraphicsThread();
+	static void* graphicsThreadFunction(void* arg);
+
+public:
+	Graphics();
+	~Graphics();
+
+};
 
 #endif /* GRAPHICS_H_ */

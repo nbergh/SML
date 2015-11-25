@@ -3,8 +3,8 @@
 
 #include "Structs.h"
 
-#define HEAP_SIZE 100000 // The heap has limited space
-#define HASH_TABLE_ENTRIES 100000 // The hash table has unlimited space, but a limited number of possible hashes
+#define HEAP_SIZE 20000 // The heap has limited space
+#define HASH_TABLE_ENTRIES 20000 // The hash table has unlimited space, but a limited number of possible hashes
 
 class PathPlanning {
 	struct aStarNode {
@@ -19,8 +19,8 @@ class PathPlanning {
 		 * with north, and only has a meaning in the vehicle local coordinate system
 		 */
 		float x, y, distanceFromStartNode, heuristic; // TODO make x,y const
-		bool isOnOpenSet, isOnClosedSet, pathIsReversingFromPrevNode;
 		double localPathAngleFromPreviousNode;
+		bool isOnOpenSet, isOnClosedSet, pathIsReversingFromPrevNode;
 		int heapArrayIndex;
 		const aStarNode *previousNodeInPath;
 	};

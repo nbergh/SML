@@ -4,7 +4,6 @@
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
-#include <stdlib.h>
 #include <unistd.h>
 
 #define UDP_PORT 2368
@@ -99,7 +98,7 @@ void* LidarUDPReceiver::receiverThreadFunction(void* arg) {
 		//printf("%d\n",curTime.tv_usec-oldTime.tv_usec);
 		//oldTime=curTime;
 	}
-	printf("%s\n","UDP receiver thread exited");
+	printf("%s\n","Lidar UDP receiver thread exited");
 	pthread_exit(NULL);
 }
 

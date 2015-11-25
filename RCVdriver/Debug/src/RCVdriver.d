@@ -111,6 +111,11 @@ src/RCVdriver.o : ../src/RCVdriver.cu \
     /usr/local/cuda-7.5/bin/../targets/x86_64-linux/include/surface_indirect_functions.h \
     /usr/local/cuda-7.5/bin/../targets/x86_64-linux/include/surface_indirect_functions.hpp \
     /usr/local/cuda-7.5/bin/../targets/x86_64-linux/include/device_launch_parameters.h \
+    /usr/include/unistd.h \
+    /usr/include/x86_64-linux-gnu/bits/posix_opt.h \
+    /usr/include/x86_64-linux-gnu/bits/environments.h \
+    /usr/include/x86_64-linux-gnu/bits/confname.h \
+    /usr/include/getopt.h \
     ../src/LidarProcessing/Headers/LidarProcessing.h \
     ../src/LidarProcessing/Headers/../../Headers/Structs.h \
     ../src/LidarProcessing/Headers/LidarUDPReceiver.h \
@@ -140,9 +145,4 @@ src/RCVdriver.o : ../src/RCVdriver.cu \
     ../src/Headers/Structs.h \
     ../src/Headers/Input.h \
     ../src/Headers/Graphics.h \
-    ../src/Headers/Parameters.h \
-    /usr/include/unistd.h \
-    /usr/include/x86_64-linux-gnu/bits/posix_opt.h \
-    /usr/include/x86_64-linux-gnu/bits/environments.h \
-    /usr/include/x86_64-linux-gnu/bits/confname.h \
-    /usr/include/getopt.h
+    ../src/Headers/Parameters.h

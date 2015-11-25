@@ -45,5 +45,24 @@ src/Graphics.o : ../src/Graphics.cpp \
     /usr/include/x86_64-linux-gnu/bits/nan.h \
     /usr/include/x86_64-linux-gnu/bits/mathdef.h \
     /usr/include/x86_64-linux-gnu/bits/mathcalls.h \
+    /usr/include/stdio.h \
+    /usr/include/libio.h \
+    /usr/include/_G_config.h \
+    /usr/include/wchar.h \
+    /usr/include/x86_64-linux-gnu/bits/stdio_lim.h \
+    /usr/include/x86_64-linux-gnu/bits/sys_errlist.h \
+    /usr/include/errno.h \
+    /usr/include/x86_64-linux-gnu/bits/errno.h \
+    /usr/include/linux/errno.h \
+    /usr/include/x86_64-linux-gnu/asm/errno.h \
+    /usr/include/asm-generic/errno.h \
+    /usr/include/asm-generic/errno-base.h \
+    /usr/include/string.h \
     ../src/Headers/Parameters.h \
-    ../src/Headers/Structs.h
+    ../src/Headers/Structs.h \
+    ../src/Headers/Graphics.h \
+    /usr/include/pthread.h \
+    /usr/include/sched.h \
+    /usr/include/x86_64-linux-gnu/bits/sched.h \
+    /usr/include/x86_64-linux-gnu/bits/timex.h \
+    /usr/include/x86_64-linux-gnu/bits/setjmp.h
