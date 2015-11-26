@@ -22,24 +22,19 @@ int main(void)
 	//Temp:
 	VehicleStatus vehicleStatus = {0};
 
-	// First initialize the main classes:
-	LidarProcessing* lidarProcessing = new LidarProcessing();
-	PositionEstimation* positionEstimation = new PositionEstimation();
-	PathPlanning* pathPlanning = new PathPlanning(lidarProcessing->getObstacleSquaresOnGPU(),lidarProcessing->getCurrentNrOfObstacles(),positionEstimation->getCurrentVehicleState(),vehicleStatus);
-	Input* input = new Input(vehicleStatus,*pathPlanning);
-	Graphics* graphics = new Graphics();
+	// Initialize the main objects:
+	LidarProcessing lidarProcessing = LidarProcessing();
+	PositionEstimation positionEstimation = PositionEstimation();
+	PathPlanning pathPlanning = PathPlanning(lidarProcessing.getLidarExportData(),positionEstimation.getCurrentVehicleState(),vehicleStatus);
+	Graphics graphics = Graphics(lidarProcessing.getLidarExportData(),pathPlanning.getPathExportData());
+	Input input = Input(vehicleStatus,pathPlanning);
 
-	while (!input->getStopMainControllerLoop()) {
+	// Start the main controller thread:
+	while (!input.getExitProgramBool()) {
 		// runMainControllerLoop controller loop
-		lidarProcessing->processLidarData(); // Process the lidar data from the sensors
-		pathPlanning->updatePathAndControlSignals(); // Update the path and send control signals
+		lidarProcessing.processLidarData(); // Process the lidar data from the sensors
+		pathPlanning.updatePathAndControlSignals(); // Update the path and send control signals
 		sleep(1); // TODO make dynamic
 	}
-
-	delete graphics;
-	delete input;
-	delete pathPlanning;
-	delete positionEstimation;
-	delete lidarProcessing;
 }
 

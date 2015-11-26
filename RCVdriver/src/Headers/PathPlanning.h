@@ -22,12 +22,12 @@ class PathPlanning {
 		double localPathAngleFromPreviousNode;
 		bool isOnOpenSet, isOnClosedSet, pathIsReversingFromPrevNode;
 		int heapArrayIndex;
-		const aStarNode *previousNodeInPath;
+		aStarNode* previousNodeInPath;
 	};
 	class HashTable {
 		struct HashBucket {
 			aStarNode node; // aStarNodes are stored here
-			HashBucket *nextBucket; // A linked list of buckets that share the same index
+			HashBucket* nextBucket; // A linked list of buckets that share the same index
 		};
 
 		HashBucket* hashArray[HASH_TABLE_ENTRIES]; // An array of hashBucket pointers
@@ -40,7 +40,7 @@ class PathPlanning {
 			~HashTable();
 
 			void clearHashTable();
-			aStarNode *addAstarNode(float x, float y);
+			aStarNode& addAstarNode(float x, float y);
 	};
 	class MinHeap {
 		aStarNode* heapArray[HEAP_SIZE]; // The heap array, with pointers to aStarNodes
@@ -51,21 +51,20 @@ class PathPlanning {
 			~MinHeap();
 
 			void clearMinHeap();
-			bool addNode(aStarNode* node); // Returns false if the heap is full. Also stores heapArrayIndex in the aStarNode
-			void bubbleNode(aStarNode* node); // Updates the heap based on the new (lower) heuristic, and updates heapArrayIndex in the node
+			bool addNode(aStarNode& node); // Returns false if the heap is full. Also stores heapArrayIndex in the aStarNode
+			void bubbleNode(aStarNode& node); // Updates the heap based on the new (lower) heuristic, and updates heapArrayIndex in the node
 			aStarNode* popNode();
-			int getAvailableSpace() const;
+			int getAvailableSpace() {return HEAP_SIZE-currentNrOfNodesInHeap;}
 	};
 
-	// External vars
-	const VehicleState& vehicleState; // Current vehicle state
-	const ObstaclePoint* obstacleSquaresOnGPU;
-	const int& currentNrOfObstacles;
+	const LidarExportData& lidarExportData;
+	const VehicleState& vehicleState;
 	VehicleStatus& vehicleStatus;
+	PathExportData pathExportData;
+	HashTable hashTable;
+	MinHeap minHeap;
 
-	// Internal vars
-	HashTable* hashTable;
-	MinHeap* minHeap;
+
 	PathPointInGPScords* macroPathGPS; // The main GPS path (start to goal) as a linked list
 	PathPointInGPScords* microPathGPS; // The path to the next point in the mainGPSpath as a linked list
 	PathPointInLocalXY* microPathXY; // The same path as microPathGPS, but in x,y coordinates
@@ -77,19 +76,17 @@ class PathPlanning {
 	void translateMacroPathToXY();
 	bool translateMicroPathToXYandCheckIfMicroPathIsTooCloseToObstacles() const;
 	bool generateMicroPath(float targetX, float targetY);
-	void discoverNeighbor(const aStarNode* baseNode, const aStarNode* targetNode, int index) const;
-	bool checkIfaStarNodeIsTooCloseToObstacles(aStarNode node, double localPathAngleFromPreviousNode) const;
+	void discoverNeighbor(aStarNode& baseNode, const aStarNode& targetNode, int index);
+	bool checkIfaStarNodeIsTooCloseToObstacles(const aStarNode& node, double localPathAngleFromPreviousNode) const;
 	void clearAllPaths(bool includeMacroPath);
-	void translateLocalXYtoGPSposition(float x, float y, GPSposition& target) const;
 
 	public:
-		PathPlanning(const ObstaclePoint* obstacleSquaresOnGPU, const int& currentNrOfObstacles, const VehicleState& vehicleState, VehicleStatus& vehicleStatus);
+		PathPlanning(const LidarExportData& lidarExportData, const VehicleState& vehicleState, VehicleStatus& vehicleStatus);
 		~PathPlanning();
 
 		void updatePathAndControlSignals();
 		void setMacroPath(const char* filePath);
-		const PathPointInLocalXY* getMicroPathXY() const;
-		const PathPointInLocalXY* getMacroPathXY() const;
+		const PathExportData& getPathExportData() {return pathExportData;}
 
 };
 

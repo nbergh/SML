@@ -4,12 +4,12 @@
 #include "../../Headers/Structs.h"
 
 class PositionEstimation {
-	VehicleState* vehicleState; // The state of the vehicle
+	VehicleState vehicleState; // The state of the vehicle
 
 public:
 	PositionEstimation();
 	~PositionEstimation();
-	const VehicleState& getCurrentVehicleState();
+	const VehicleState& getCurrentVehicleState() {return vehicleState;}
 };
 
 

@@ -4,18 +4,13 @@
  * longitudinal centerline. CurrentHeading must always be between -Pi and Pi
  */
 
-PositionEstimation::PositionEstimation() {
-	vehicleState = new VehicleState;
+PositionEstimation::PositionEstimation() :
+		vehicleState() {
 
 	// Very temp:
-	vehicleState->currentPosition.latc=59.35096;
-	vehicleState->currentPosition.longc=18.06808;
+	vehicleState.currentPosition.latc=59.35096;
+	vehicleState.currentPosition.longc=18.06808;
 }
 
 PositionEstimation::~PositionEstimation() {
-	delete vehicleState;
-}
-
-const VehicleState& PositionEstimation::getCurrentVehicleState() {
-	return *vehicleState;
 }

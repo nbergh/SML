@@ -7,8 +7,8 @@
 
 Input::Input(VehicleStatus& vehicleStatus, PathPlanning& pathPlanning):
 		vehicleStatus(vehicleStatus),
-		pathPlanning(pathPlanning),
-		stopMainControllerLoop(false) {
+		pathPlanning(pathPlanning) {
+
 	startParserThread();
 }
 
@@ -20,6 +20,7 @@ Input::~Input() {
 
 void Input::startParserThread() {
 	stopParserThread=false;
+	exitProgram=false;
 
 	//Start the receiver thread
 	if(pthread_create(&parserThreadID,NULL,parserThreadFunction,this)) {
@@ -85,7 +86,7 @@ void* Input::parserThreadFunction(void* arg) {
 		}
 		if (thisPointer->compareStrings(inputCommand,"exit",4)) {
 			printf("%s\n","Program exiting");
-			thisPointer->stopMainControllerLoop=true;
+			thisPointer->exitProgram=true;
 			break;
 		}
 
@@ -96,8 +97,5 @@ void* Input::parserThreadFunction(void* arg) {
 	pthread_exit(NULL);
 }
 
-bool Input::getStopMainControllerLoop() {
-	return stopMainControllerLoop;
-}
 
 

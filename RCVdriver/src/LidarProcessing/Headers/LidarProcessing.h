@@ -14,6 +14,7 @@ class LidarProcessing {
 
 	// Members:
 	LidarUDPReceiver* lidarUDPReceiver;
+	LidarExportData lidarExportData;
 	int currentNrOfObstacles;
 
 	void allocateMemory();
@@ -25,10 +26,7 @@ class LidarProcessing {
 		LidarProcessing();
 		~LidarProcessing();
 		void processLidarData();
-		const LidarDataPoint* getLidarDataPoints() const;
-		const ObstaclePoint* getObstacleSquares() const;
-		const ObstaclePoint* getObstacleSquaresOnGPU() const;
-		const int& getCurrentNrOfObstacles() const;
+		const LidarExportData& getLidarExportData() {return lidarExportData;}
 };
 
 

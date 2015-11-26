@@ -10,9 +10,15 @@ namespace {
 }
 
 
-LidarProcessing::LidarProcessing() {
+LidarProcessing::LidarProcessing() :
+		lidarExportData(currentNrOfObstacles) {
 	// First allocate all data needed by this class:
 	allocateMemory();
+
+	lidarExportData.lidarDataPoints = lidarDataPoints;
+	lidarExportData.obstacleSquares = obstacleSquares;
+	lidarExportData.obstacleSquaresOnGPU = obstacleSquaresOnGPU;
+	lidarExportData.currentNrOfObstacles = currentNrOfObstacles;
 
 	// Then initialize the UDP socket, test the connection, and start the UDP receiver thread:
 	lidarUDPReceiver = new LidarUDPReceiver(rawLidarData);
@@ -121,22 +127,6 @@ void LidarProcessing::identifyObstaclesInLidarData() {
 void LidarProcessing::processLidarData() {
 	translateLidarDataFromRawToXYZ();
 	identifyObstaclesInLidarData();
-}
-
-const LidarDataPoint* LidarProcessing::getLidarDataPoints() const {
-	return lidarDataPoints;
-}
-
-const ObstaclePoint* LidarProcessing::getObstacleSquares() const {
-	return obstacleSquares;
-}
-
-const ObstaclePoint* LidarProcessing::getObstacleSquaresOnGPU() const {
-	return obstacleSquaresOnGPU;
-}
-
-const int& LidarProcessing::getCurrentNrOfObstacles() const {
-	return currentNrOfObstacles;
 }
 
 namespace { // Limit scope to translation unit
@@ -269,9 +259,9 @@ namespace { // Limit scope to translation unit
 				(obstacleSquaresOnGPU+4*myObstacleIndex)->y = obstacleY;
 				(obstacleSquaresOnGPU+4*myObstacleIndex+1)->x = obstacleX+GROUND_GRID_RESOLUTION;
 				(obstacleSquaresOnGPU+4*myObstacleIndex+1)->y = obstacleY;
-				(obstacleSquaresOnGPU+4*myObstacleIndex+2)->x = obstacleX;
+				(obstacleSquaresOnGPU+4*myObstacleIndex+2)->x = obstacleX+GROUND_GRID_RESOLUTION;
 				(obstacleSquaresOnGPU+4*myObstacleIndex+2)->y = obstacleY+GROUND_GRID_RESOLUTION;
-				(obstacleSquaresOnGPU+4*myObstacleIndex+3)->x = obstacleX+GROUND_GRID_RESOLUTION;
+				(obstacleSquaresOnGPU+4*myObstacleIndex+3)->x = obstacleX;
 				(obstacleSquaresOnGPU+4*myObstacleIndex+3)->y = obstacleY+GROUND_GRID_RESOLUTION;
 			}
 		}

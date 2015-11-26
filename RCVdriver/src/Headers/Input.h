@@ -10,7 +10,7 @@ class Input {
 	PathPlanning& pathPlanning; // Pointer to the pathPlanning object, so the parser can call its public functions
 
 	//Internally located:
-	bool stopParserThread, stopMainControllerLoop;
+	bool stopParserThread, exitProgram;
 	pthread_t parserThreadID;
 
 	void startParserThread();
@@ -21,7 +21,7 @@ class Input {
 public:
 	Input(VehicleStatus& vehicleStatus, PathPlanning& pathPlanning);
 	~Input();
-	bool getStopMainControllerLoop();
+	bool getExitProgramBool() {return exitProgram;}
 };
 
 

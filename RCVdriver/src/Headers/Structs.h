@@ -15,6 +15,23 @@ struct PathPointInLocalXY {
 	float x,y;
 	unsigned char r,b,g; // Colors of the point
 };
+struct LidarExportData {
+	LidarExportData(int currentNrOfObstacles) :
+		currentNrOfObstacles(currentNrOfObstacles),lidarDataPoints(0),obstacleSquares(0),obstacleSquaresOnGPU(0) {}
+
+	LidarDataPoint* lidarDataPoints;
+	ObstaclePoint* obstacleSquares,* obstacleSquaresOnGPU;
+	int& currentNrOfObstacles;
+};
+struct PathExportData {
+	PathExportData(int lengthOfMacroPath,int currentIndexInMacroPath,int lengthOfMicroPath,int currentIndexInMicroPath) :
+		lengthOfMacroPath(lengthOfMacroPath),currentIndexInMacroPath(currentIndexInMacroPath),
+		lengthOfMicroPath(lengthOfMicroPath),currentIndexInMicroPath(currentIndexInMicroPath),
+		macroPathXY(0),microPathXY(0) {}
+
+	PathPointInLocalXY* macroPathXY,* microPathXY;
+	int& lengthOfMacroPath,& currentIndexInMacroPath,& lengthOfMicroPath,& currentIndexInMicroPath;
+};
 
 //Not used by openGL:
 struct GPSposition {
