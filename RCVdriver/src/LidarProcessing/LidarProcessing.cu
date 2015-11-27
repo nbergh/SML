@@ -124,9 +124,21 @@ void LidarProcessing::identifyObstaclesInLidarData() {
 	cudaDeviceSynchronize();
 }
 
+#include <stdio.h> //temp
 void LidarProcessing::processLidarData() {
 	translateLidarDataFromRawToXYZ();
 	identifyObstaclesInLidarData();
+
+	//Temp:
+	bool ml=false;
+	if (ml) {
+		for (int i=0;i<currentNrOfObstacles;i++) {
+			printf("%s%f%s%f%s%f%s%f%s\n","plot([",(obstacleSquares+4*i)->x,",",(obstacleSquares+4*i+1)->x,"],[",(obstacleSquares+4*i)->y,",",(obstacleSquares+4*i+1)->y,"],'r')");
+			printf("%s%f%s%f%s%f%s%f%s\n","plot([",(obstacleSquares+4*i)->x,",",(obstacleSquares+4*i+3)->x,"],[",(obstacleSquares+4*i)->y,",",(obstacleSquares+4*i+3)->y,"],'r')");
+			printf("%s%f%s%f%s%f%s%f%s\n","plot([",(obstacleSquares+4*i+1)->x,",",(obstacleSquares+4*i+2)->x,"],[",(obstacleSquares+4*i+1)->y,",",(obstacleSquares+4*i+2)->y,"],'r')");
+			printf("%s%f%s%f%s%f%s%f%s\n","plot([",(obstacleSquares+4*i+3)->x,",",(obstacleSquares+4*i+2)->x,"],[",(obstacleSquares+4*i+3)->y,",",(obstacleSquares+4*i+2)->y,"],'r')");
+		}
+	}
 }
 
 namespace { // Limit scope to translation unit
@@ -237,23 +249,25 @@ namespace { // Limit scope to translation unit
 	}
 
 	__global__ void identifyObstacles(const int* obstacleMatrixForMaxZOnGPU,const int* obstacleMatrixForMinZOnGPU,ObstaclePoint* obstacleSquaresOnGPU,int* deviceObstacleArrayIndex) {
-
-		__shared__ float maxObstacleDetectionDistance;
-		maxObstacleDetectionDistance = GROUND_GRID_RESOLUTION * GROUND_GRID_FIELDS_PER_SIDE/2.0;
 		int myThreadID = blockIdx.x*blockDim.x+threadIdx.x,myMatrixXcoord,myMatrixYcoord,myObstacleIndex,numberOfMatrixFields = GROUND_GRID_FIELDS_PER_SIDE*GROUND_GRID_FIELDS_PER_SIDE;
 		float obstacleX,obstacleY;
 
+		myMatrixXcoord = myThreadID/GROUND_GRID_FIELDS_PER_SIDE;
+		myMatrixYcoord = myThreadID - myMatrixXcoord*GROUND_GRID_FIELDS_PER_SIDE;
+		obstacleX = myMatrixXcoord*GROUND_GRID_RESOLUTION - GROUND_GRID_RESOLUTION*GROUND_GRID_FIELDS_PER_SIDE/2.0;
+		obstacleY = myMatrixYcoord*GROUND_GRID_RESOLUTION - GROUND_GRID_RESOLUTION*GROUND_GRID_FIELDS_PER_SIDE/2.0;
+
 		/* To go back from matrix coordinates to LidarDataPoint x and y coordinates, we do the same steps as described
-		 * above, but in reverse
+		 * above, but in reverse. An obstacle is registered if myThreadID is within the matrix, the obstacle coords are outside
+		 * of the RCV vehicle, and the max Z in obstacleMatrixForMaxZOnGPU minus the min Z in obstacleMatrixForMinZOnGPU is larger
+		 * than MIN_OBSTACLE_DELTA_Z
 		 */
-		if (myThreadID<numberOfMatrixFields && (*(obstacleMatrixForMaxZOnGPU+myThreadID) - *(obstacleMatrixForMinZOnGPU+myThreadID) > zValAsInt(MIN_OBSTACLE_DELTA_Z))) {
+		if (	myThreadID<numberOfMatrixFields && abs(obstacleX) > RCV_WIDTH/2.0 && abs(obstacleY) > RCV_LENGTH/2.0 &&
+				(*(obstacleMatrixForMaxZOnGPU+myThreadID)-*(obstacleMatrixForMinZOnGPU+myThreadID) > zValAsInt(MIN_OBSTACLE_DELTA_Z))) {
+
 			// Obstacle identified
 			myObstacleIndex = atomicAdd(deviceObstacleArrayIndex,1);
 			if (myObstacleIndex < MAX_NUMBER_OF_OBSTACLES) {
-				myMatrixXcoord = myThreadID/GROUND_GRID_FIELDS_PER_SIDE;
-				myMatrixYcoord = myThreadID - myMatrixXcoord*GROUND_GRID_FIELDS_PER_SIDE;
-				obstacleX = myMatrixXcoord*GROUND_GRID_RESOLUTION-maxObstacleDetectionDistance;
-				obstacleY = myMatrixYcoord*GROUND_GRID_RESOLUTION-maxObstacleDetectionDistance;
 				// Now write the coordinates to the obstacle square:
 				(obstacleSquaresOnGPU+4*myObstacleIndex)->x = obstacleX;
 				(obstacleSquaresOnGPU+4*myObstacleIndex)->y = obstacleY;

@@ -18,7 +18,7 @@
 #define RCV_HEIGHT 0.7 // In meters
 #define OBSTACLE_SAFETY_DISTANCE 0.1
 /* The minimum distance in meters from any obstacle that the pathplanner will keep. Don't set to less than GROUND_GRID_RESOLUTION,
- * since the distance to an obstacle from a pathNode has an an error margin of +/- GROUND_GRID_RESOLUTION
+ * since the distance to an obstacle from a pathNode has an an error margin of +/- sqrt(2)/2 * GROUND_GRID_RESOLUTION
  */
 
 
