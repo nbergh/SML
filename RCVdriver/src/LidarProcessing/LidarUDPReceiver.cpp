@@ -32,9 +32,10 @@ LidarUDPReceiver::LidarUDPReceiver(char* rawLidarData) {
 	}
 
 	// Test to see if lidar data can be received:
-	printf("%s%d%s\n","Trying to receive lidar data on port ", UDP_PORT, "...");
-	tryToReceiveLidarPacket();
-	printf("%s\n","...success!");
+	//temp:
+//	printf("%s%d%s\n","Trying to receive lidar data on port ", UDP_PORT, "...");
+//	tryToReceiveLidarPacket();
+//	printf("%s\n","...success!");
 	startReceiverThread();
 }
 

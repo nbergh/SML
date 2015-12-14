@@ -26,7 +26,7 @@ int main(void)
 	LidarProcessing lidarProcessing = LidarProcessing();
 	PositionEstimation positionEstimation = PositionEstimation();
 	PathPlanning pathPlanning = PathPlanning(lidarProcessing.getLidarExportData(),positionEstimation.getCurrentVehicleState(),vehicleStatus);
-	//Graphics graphics = Graphics(lidarProcessing.getLidarExportData(),pathPlanning.getPathExportData());
+//	Graphics graphics = Graphics(lidarProcessing.getLidarExportData(),pathPlanning.getPathExportData());
 	Input input = Input(vehicleStatus,pathPlanning);
 
 	// Start the main controller thread:

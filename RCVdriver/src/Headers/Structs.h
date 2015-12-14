@@ -16,7 +16,7 @@ struct PathPointInLocalXY {
 	unsigned char r,b,g; // Colors of the point
 };
 struct LidarExportData {
-	LidarExportData(int currentNrOfObstacles) :
+	LidarExportData(int& currentNrOfObstacles) :
 		currentNrOfObstacles(currentNrOfObstacles),lidarDataPoints(0),obstacleSquares(0),obstacleSquaresOnGPU(0) {}
 
 	LidarDataPoint* lidarDataPoints;

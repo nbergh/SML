@@ -38,7 +38,9 @@ void* Graphics::graphicsThreadFunction(void* arg) {
 	thisPointer->cameraPosition.z = 5; // Set camera position to start at z=5
 
 	// Init glut and create window
-	//glutInit(&argc, argv);
+	int argc = 0;
+	char* argv = NULL;
+	glutInit(&argc, &argv);
 	glutInitDisplayMode(GLUT_DEPTH | GLUT_DOUBLE | GLUT_RGBA);
 	glutInitWindowPosition(0,0);
 	glutInitWindowSize(1000,1000);

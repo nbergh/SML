@@ -14,7 +14,7 @@
 namespace {
 	// Non-member function declarations
 	__global__ void translatePathToXY(PathPointInGPScords* pathGPSOnGPU, PathPointInLocalXY* pathXYonGPU, int lengthOfPath, VehicleState vehicleState);
-	__global__ void checkIfaStarNodeIsTooCloseToObstaclesKernel(float nodeX, float nodeY, double localPathAngleFromPreviousNode, const ObstaclePoint* obstacleSquaresOnGPU, int nrOfObstacles, bool* isTooClosePointerOnGPU);
+	__global__ void checkIfaStarNodeIsTooCloseToObstaclesKernel(float nodeX, float nodeY, double localTargetHeading, const ObstaclePoint* obstacleSquaresOnGPU, int nrOfObstacles, bool* isTooClosePointerOnGPU);
 	__global__ void checkPathForCollisions(PathPointInGPScords* pathGPSOnGPU, PathPointInLocalXY* pathXYonGPU, int lengthOfPath, const ObstaclePoint* obstacleSquaresOnGPU, int nrOfObstacles, VehicleState vehicleState, bool* isTooClosePointerOnGPU);
 	float rotateAndGetX(float x, float y, double angle);
 	float rotateAndGetY(float x, float y, double angle);
@@ -56,7 +56,8 @@ void PathPlanning::updatePathAndControlSignals() {
 		return;
 	}
 	translateMacroPathToXY();
-	if ((lengthOfMicroPath==0 || !translateMicroPathToXYandCheckIfMicroPathIsTooCloseToObstacles()) && !generateMicroPath(macroPathXY[currentIndexInMacroPath].x,macroPathXY[currentIndexInMacroPath].y)) {
+	if ((lengthOfMicroPath==0 || !translateMicroPathToXYandCheckIfMicroPathIsTooCloseToObstacles())	&& !generateMicroPath(macroPathXY[currentIndexInMacroPath].x,macroPathXY[currentIndexInMacroPath].y,getHeadingForMicroPathTarget())) {
+
 		/* If the code goes here, it means that {microPath hadn't been set OR microPath is no longer traversable}
 		 * AND no new microPath could be generated. The program should then return
 		 */
@@ -90,7 +91,7 @@ void PathPlanning::updatePathAndControlSignals() {
 
 bool PathPlanning::updatePathIndexes() {
 	// This function updates currentIndexInMicroPath and currentIndexInMacroPath based on the current vehicle position
-	double currentPathAngle;
+	double currentPathHeading;
 	float vehicleDeltaLatFromPrevGPSpoint,vehicleDeltaLongFromPrevGPSpoint,gpsPointDeltaLatFromPrevGPSpoint,gpsPointDeltaLongFromPrevGPSpoint,vehicleRotatedY,gpsPointRotatedY;
 	while(true) {
 		if (currentIndexInMicroPath==lengthOfMicroPath) {
@@ -122,15 +123,15 @@ bool PathPlanning::updatePathIndexes() {
 				vehicleDeltaLongFromPrevGPSpoint = getLongDistanceBetweenGPSpositions(macroPathGPS[currentIndexInMacroPath-1].position,vehicleState.currentPosition);
 				gpsPointDeltaLatFromPrevGPSpoint = macroPathGPS[currentIndexInMacroPath].latDistanceFromPrevPathPoint;
 				gpsPointDeltaLongFromPrevGPSpoint = macroPathGPS[currentIndexInMacroPath].longDistanceFromPrevPathPoint;
-				currentPathAngle = macroPathGPS[currentIndexInMacroPath].headingFromPrevPathPoint;
+				currentPathHeading = macroPathGPS[currentIndexInMacroPath].headingFromPrevPathPoint;
 
-				vehicleRotatedY = rotateAndGetY(vehicleDeltaLatFromPrevGPSpoint,vehicleDeltaLongFromPrevGPSpoint,currentPathAngle);
-				gpsPointRotatedY = rotateAndGetY(gpsPointDeltaLatFromPrevGPSpoint,gpsPointDeltaLongFromPrevGPSpoint,currentPathAngle);
+				vehicleRotatedY = rotateAndGetY(vehicleDeltaLatFromPrevGPSpoint,vehicleDeltaLongFromPrevGPSpoint,currentPathHeading);
+				gpsPointRotatedY = rotateAndGetY(gpsPointDeltaLatFromPrevGPSpoint,gpsPointDeltaLongFromPrevGPSpoint,currentPathHeading);
 
 				if (vehicleRotatedY>gpsPointRotatedY) {currentIndexInMacroPath++;}
 				else {break;} // If false, the currentIndexInMacroPath is still ahead of the vehicle, and should be the current target for the microPath
 			}
-			generateMicroPath(macroPathXY[currentIndexInMacroPath].x,macroPathXY[currentIndexInMacroPath].y);
+			generateMicroPath(macroPathXY[currentIndexInMacroPath].x,macroPathXY[currentIndexInMacroPath].y,getHeadingForMicroPathTarget());
 			continue; // It is possible that microPath has length 1 at this point, so start from the top to check if that is the case (if so the macroPathIndex will be updated)
 		}
 
@@ -141,10 +142,10 @@ bool PathPlanning::updatePathIndexes() {
 		vehicleDeltaLongFromPrevGPSpoint = getLongDistanceBetweenGPSpositions(microPathGPS[currentIndexInMicroPath-1].position,vehicleState.currentPosition);
 		gpsPointDeltaLatFromPrevGPSpoint = microPathGPS[currentIndexInMicroPath].latDistanceFromPrevPathPoint;
 		gpsPointDeltaLongFromPrevGPSpoint = microPathGPS[currentIndexInMicroPath].longDistanceFromPrevPathPoint;
-		currentPathAngle = microPathGPS[currentIndexInMicroPath].headingFromPrevPathPoint;
+		currentPathHeading = microPathGPS[currentIndexInMicroPath].headingFromPrevPathPoint;
 
-		vehicleRotatedY = rotateAndGetY(vehicleDeltaLatFromPrevGPSpoint,vehicleDeltaLongFromPrevGPSpoint,currentPathAngle);
-		gpsPointRotatedY = rotateAndGetY(gpsPointDeltaLatFromPrevGPSpoint,gpsPointDeltaLongFromPrevGPSpoint,currentPathAngle);
+		vehicleRotatedY = rotateAndGetY(vehicleDeltaLatFromPrevGPSpoint,vehicleDeltaLongFromPrevGPSpoint,currentPathHeading);
+		gpsPointRotatedY = rotateAndGetY(gpsPointDeltaLatFromPrevGPSpoint,gpsPointDeltaLongFromPrevGPSpoint,currentPathHeading);
 
 		if (vehicleRotatedY>gpsPointRotatedY) {currentIndexInMicroPath++;}
 		else {break;}
@@ -274,7 +275,12 @@ void PathPlanning::setMacroPath(const char* filePath) {
 	printf("%s\n","Path successfully loaded");
 }
 
-bool PathPlanning::generateMicroPath(float targetX, float targetY) {
+double PathPlanning::getHeadingForMicroPathTarget() {
+	if (currentIndexInMacroPath==lengthOfMacroPath-1) {return macroPathGPS[currentIndexInMacroPath].headingFromPrevPathPoint;} // TODO, change to local heading
+	return macroPathGPS[currentIndexInMacroPath+1].headingFromPrevPathPoint;
+}
+
+bool PathPlanning::generateMicroPath(float targetX, float targetY, double targetHeading) {
 	/* This function generates a path from {0,0} to targetX,targetY using a variant of A* tailored for producing vehicle paths
 	 * returns true if a path was found, and false otherwise
 	 */
@@ -285,7 +291,7 @@ bool PathPlanning::generateMicroPath(float targetX, float targetY) {
 	hashTable.clearHashTable();
 	minHeap.clearMinHeap();
 
-	aStarNode* baseNodePointer = &hashTable.addAstarNode(0,0),& targetNode = hashTable.addAstarNode(targetX,targetY);
+	aStarNode* baseNodePointer = &hashTable.addAstarNode(0,-1,0,0,false),& targetNode = hashTable.addAstarNode(targetX-sin(targetHeading),targetY-cos(targetHeading),targetX,targetY,false);
 
 	while (true) {
 		baseNodePointer->isOnClosedSet=true;
@@ -333,18 +339,18 @@ bool PathPlanning::generateMicroPath(float targetX, float targetY) {
 		 */
 		microPathGPS[i].position.latc = vehicleState.currentPosition.latc + rotateAndGetY(currentNodePointer->x,currentNodePointer->y,-vehicleState.currentHeading) * (1.0/LENGTH_OF_ONE_LAT_DEGREE_IN_METERS);
 		microPathGPS[i].position.longc = vehicleState.currentPosition.longc + rotateAndGetX(currentNodePointer->x,currentNodePointer->y,-vehicleState.currentHeading) * (1.0/LENGTH_OF_ONE_LONG_DEGREE_IN_METERS);
-		microPathGPS[i].headingFromPrevPathPoint = vehicleState.currentHeading + currentNodePointer->localPathAngleFromPreviousNode;
+//		microPathGPS[i].headingFromPrevPathPoint = vehicleState.currentHeading + currentNodePointer->pathHeadingFromPrevNode; // TODO maybe change
 		microPathGPS[i].latDistanceFromPrevPathPoint = rotateAndGetY(currentNodePointer->x-currentNodePointer->previousNodeInPath->x,currentNodePointer->y-currentNodePointer->previousNodeInPath->y,vehicleState.currentHeading);
 		microPathGPS[i].longDistanceFromPrevPathPoint = rotateAndGetX(currentNodePointer->x-currentNodePointer->previousNodeInPath->x,currentNodePointer->y-currentNodePointer->previousNodeInPath->y,vehicleState.currentHeading);
-		microPathGPS[i].isReversingFromPrevNode = currentNodePointer->pathIsReversingFromPrevNode;
+		microPathGPS[i].isReversingFromPrevNode = currentNodePointer->vehicleIsReversingFromPrevNode;
 
 		microPathXY[i].x = currentNodePointer->x;
 		microPathXY[i].y = currentNodePointer->y;
-		if (currentNodePointer->pathIsReversingFromPrevNode) {microPathXY[i].r=255;} // Set colors of the path; red for reversing, green otherwise
+		if (currentNodePointer->vehicleIsReversingFromPrevNode) {microPathXY[i].r=255;} // Set colors of the path; red for reversing, green otherwise
 		else {microPathXY[i].g=255;}
 
 		// temp
-		if (!currentNodePointer->pathIsReversingFromPrevNode) {printf("%s%f%s%f%s%f%s%f%s\n","quiver(",currentNodePointer->x,",",currentNodePointer->y,",",currentNodePointer->previousNodeInPath->x-currentNodePointer->x,",",currentNodePointer->previousNodeInPath->y-currentNodePointer->y,",0,'g')");}
+		if (!currentNodePointer->vehicleIsReversingFromPrevNode) {printf("%s%f%s%f%s%f%s%f%s\n","quiver(",currentNodePointer->x,",",currentNodePointer->y,",",currentNodePointer->previousNodeInPath->x-currentNodePointer->x,",",currentNodePointer->previousNodeInPath->y-currentNodePointer->y,",0,'g')");}
 		else {printf("%s%f%s%f%s%f%s%f%s\n","quiver(",currentNodePointer->x,",",currentNodePointer->y,",",currentNodePointer->previousNodeInPath->x-currentNodePointer->x,",",currentNodePointer->previousNodeInPath->y-currentNodePointer->y,",0,'r')");}
 
 		currentNodePointer=currentNodePointer->previousNodeInPath;
@@ -359,100 +365,104 @@ bool PathPlanning::generateMicroPath(float targetX, float targetY) {
 	return true;
 }
 
+//	// Add some values to neighborDistanceFromStartNode to punish not being aligned with localTargetHeading and switching driving direction
+//	localHeading = neighborLocalPathHeadingFromPreviousNode + ((index>4) ? M_PI : 0);
+//	if (localHeading > M_PI) {localHeading-=2*M_PI;}
+//	neighborDistanceFromStartNode += 2*abs(localTargetHeading - localHeading);
+//
+//	if ((index>4 && !baseNode.pathIsReversingFromPrevNode) || (index<5 && baseNode.pathIsReversingFromPrevNode)) {
+//		// Path switches from reverse to forward or other way around
+//		neighborDistanceFromStartNode+=1;
+//	}
+
+
+//temp:
 int iter=0;
 void PathPlanning::discoverNeighbor(aStarNode& baseNode, const aStarNode& targetNode, const int index) {
 	/* This function discovers a neighbor node to baseNode, looking in 8 directions forward, and 8 directions backward
-	 * First time it is called (when baseNode==startNode), baseNode->angleFromPreviousNodeInPath = 0
+	 * First time it is called (when baseNode==startNode), baseNode->HeadingFromPreviousNodeInPath = 0
 	 */
-	float stepDistance=GROUND_GRID_RESOLUTION; // The stepping distance between each point in the path
-	double deltaAngle,directionAngle,neighborLocalPathAngleFromPreviousNode;
+	float neighborDistanceFromStartNode, neighborHeuristic, stepDistance;  // The stepping distance between each point in the path
+	double deltaAngle,newAngle;
+	bool vehicleIsReversingFromBaseNode;
 	switch(index) {
-		// Going forward. The RCV has a turn radius of 4.5 meters, so max turn angle it 0.103 radians
-		case 0: {deltaAngle=0+(baseNode.pathIsReversingFromPrevNode ? M_PI : 0);break;}
-		case 1: {deltaAngle=0.0515+(baseNode.pathIsReversingFromPrevNode ? M_PI : 0);stepDistance*=20;break;}
-		case 2: {deltaAngle=0.103+(baseNode.pathIsReversingFromPrevNode ? M_PI : 0);stepDistance*=10;break;}
-		case 3: {deltaAngle=-0.0515+(baseNode.pathIsReversingFromPrevNode ? M_PI : 0);stepDistance*=20;break;}
-		case 4: {deltaAngle=-0.103+(baseNode.pathIsReversingFromPrevNode ? M_PI : 0);stepDistance*=10;break;}
-		// Reversing:
-		case 5: {deltaAngle=0+(baseNode.pathIsReversingFromPrevNode ? 0 : M_PI);break;}
-		case 6: {deltaAngle=0.0515+(baseNode.pathIsReversingFromPrevNode ? 0 : M_PI);stepDistance*=20;break;}
-		case 7: {deltaAngle=0.103+(baseNode.pathIsReversingFromPrevNode ? 0 : M_PI);stepDistance*=10;break;}
-		case 8: {deltaAngle=-0.0515+(baseNode.pathIsReversingFromPrevNode ? 0 : M_PI);stepDistance*=20;break;}
-		case 9: {deltaAngle=-0.103+(baseNode.pathIsReversingFromPrevNode ? 0 : M_PI);stepDistance*=10;break;}
+		// Keep going in the same direction:
+		case 0: {deltaAngle=0;stepDistance=GROUND_GRID_RESOLUTION*5;break;}
+		case 1: {deltaAngle=0.0515;stepDistance=GROUND_GRID_RESOLUTION*20;break;}
+		case 2: {deltaAngle=0.103;stepDistance=GROUND_GRID_RESOLUTION*10;break;}
+		case 3: {deltaAngle=-0.0515;stepDistance=GROUND_GRID_RESOLUTION*20;break;}
+		case 4: {deltaAngle=-0.103;stepDistance=GROUND_GRID_RESOLUTION*10;break;}
+		// Switch direction (going from driving forwards to reversing, or vice versa)
+		case 5: {deltaAngle=0+M_PI;stepDistance=GROUND_GRID_RESOLUTION*5;break;}
+		case 6: {deltaAngle=0.0515+M_PI;stepDistance=GROUND_GRID_RESOLUTION*20;break;}
+		case 7: {deltaAngle=0.103+M_PI;stepDistance=GROUND_GRID_RESOLUTION*10;break;}
+		case 8: {deltaAngle=-0.0515+M_PI;stepDistance=GROUND_GRID_RESOLUTION*20;break;}
+		case 9: {deltaAngle=-0.103+M_PI;stepDistance=GROUND_GRID_RESOLUTION*10;break;}
 	}
-	directionAngle = baseNode.localPathAngleFromPreviousNode + deltaAngle;
+	newAngle = baseNode.vehicleHeadingAtNode + (baseNode.vehicleIsReversingFromPrevNode ? M_PI : 0) + deltaAngle;
+	vehicleIsReversingFromBaseNode = ((baseNode.vehicleIsReversingFromPrevNode && index<5) || (!baseNode.vehicleIsReversingFromPrevNode && index>4));
 
-	aStarNode& neighborNode = hashTable.addAstarNode((baseNode.x + stepDistance * sin(directionAngle)),(baseNode.y + stepDistance * cos(directionAngle)));
+	aStarNode& neighborNode = hashTable.addAstarNode(baseNode.x,baseNode.y,baseNode.x+stepDistance*sin(newAngle),baseNode.y+stepDistance*cos(newAngle),vehicleIsReversingFromBaseNode);
 	// Adds the new node to the hashtable, or gets it if it's already there. The y-axis goes along the vehicle longitudinal centerline
 
-	neighborLocalPathAngleFromPreviousNode = atan2(neighborNode.x-baseNode.x,neighborNode.y-baseNode.y);
-	/* LocalPathAngleFromPreviousNode is the angle going from {the vehicle centerline vector pointing forwards}
-	 * to {the vector going from baseNode to neihgborNode}. It is local in the coordinate system of the vehicle
-	 */
-
-	if (neighborNode.isOnClosedSet) {return;}// || checkIfaStarNodeIsTooCloseToObstacles(neighborNode,neighborLocalPathAngleFromPreviousNode)) {return;}
+	//temp:
+	if (neighborNode.isOnClosedSet){return;}// || checkIfaStarNodeIsTooCloseToObstacles(neighborNode,neighborLocalPathHeadingFromPreviousNode)) {return;}
 	// If neigborNode is on closed set, or if it is too close to an obstacle, ignore it and return
 
 	// Calculate the new distance from start node and heuristics:
-	float neighborDistanceFromStartNode;
 	neighborDistanceFromStartNode = sqrt((baseNode.x-neighborNode.x)*(baseNode.x-neighborNode.x)+(baseNode.y-neighborNode.y)*(baseNode.y-neighborNode.y));
-	if (index>4) {neighborDistanceFromStartNode *= 2;} //Increase the distance if the vehicle is reversing (punish reversing). A lot of modifications can be done here
+//	if (index>4) {neighborDistanceFromStartNode*=1.5;} // Punish reversing
 	neighborDistanceFromStartNode += baseNode.distanceFromStartNode;
 
-	float neighbourHeuristic;
-	neighbourHeuristic = neighborDistanceFromStartNode;
-	neighbourHeuristic += sqrt((neighborNode.x-targetNode.x)*(neighborNode.x-targetNode.x)+(neighborNode.y-targetNode.y)*(neighborNode.y-targetNode.y));
+	neighborHeuristic = sqrt((neighborNode.x-targetNode.x)*(neighborNode.x-targetNode.x)+(neighborNode.y-targetNode.y)*(neighborNode.y-targetNode.y));
+	neighborHeuristic += neighborDistanceFromStartNode;
+	neighborHeuristic += 5*abs(targetNode.vehicleHeadingAtNode - neighborNode.vehicleHeadingAtNode); // Make the path align with targetheading
+	neighborHeuristic += (index>4) ? 1.5 : 0; // Punish switching direction
 
-	bool ml=true; // temp
+	//temp:
 	iter++;
 
 	if (!neighborNode.isOnOpenSet) {
 		// Node has not been discovered yet
 		neighborNode.isOnOpenSet=true;
 
-		neighborNode.distanceFromStartNode =neighborDistanceFromStartNode;
-		neighborNode.heuristic = neighbourHeuristic;
-		neighborNode.localPathAngleFromPreviousNode = neighborLocalPathAngleFromPreviousNode;
+		neighborNode.distanceFromStartNode = neighborDistanceFromStartNode;
+		neighborNode.heuristic = neighborHeuristic;
 		neighborNode.previousNodeInPath = &baseNode;
-		if (index<5) {neighborNode.pathIsReversingFromPrevNode=false;}
-		else {neighborNode.pathIsReversingFromPrevNode=true;}
+		neighborNode.vehicleIsReversingFromPrevNode=vehicleIsReversingFromBaseNode;
 
 		if(!minHeap.addNode(neighborNode)) {return;} // Minheap is full, however this should never happen, since that is being checked in generateMicroPath before calling this function
 
-		if(ml) {//temp
-			if (neighborNode.pathIsReversingFromPrevNode) {printf("%s%f%s%f%s%f%s%f%s\n","plot([",neighborNode.x,",",baseNode.x,"],[",neighborNode.y,",",baseNode.y,"],'r')");}
-			else {printf("%s%f%s%f%s%f%s%f%s\n","plot([",neighborNode.x,",",baseNode.x,"],[",neighborNode.y,",",baseNode.y,"],'g')");}
-		}
+		//temp:
+		if (neighborNode.vehicleIsReversingFromPrevNode) {printf("%s%f%s%f%s%f%s%f%s\n","plot([",neighborNode.x,",",baseNode.x,"],[",neighborNode.y,",",baseNode.y,"],'r')");}
+		else {printf("%s%f%s%f%s%f%s%f%s\n","plot([",neighborNode.x,",",baseNode.x,"],[",neighborNode.y,",",baseNode.y,"],'g')");}
+
 	}
 	else if (neighborDistanceFromStartNode < neighborNode.distanceFromStartNode) {
-		if(ml) {//temp
-			printf("%s%f%s%f%s%f%s%f%s\n","plot([",neighborNode.x,",",neighborNode.previousNodeInPath->x,"],[",neighborNode.y,",",neighborNode.previousNodeInPath->y,"],'w')");
-		}
+		//temp:
+		printf("%s%f%s%f%s%f%s%f%s\n","plot([",neighborNode.x,",",neighborNode.previousNodeInPath->x,"],[",neighborNode.y,",",neighborNode.previousNodeInPath->y,"],'w')");
 
 		neighborNode.distanceFromStartNode = neighborDistanceFromStartNode;
-		neighborNode.heuristic = neighbourHeuristic;
-		neighborNode.localPathAngleFromPreviousNode = neighborLocalPathAngleFromPreviousNode;
+		neighborNode.heuristic = neighborHeuristic;
 		neighborNode.previousNodeInPath = &baseNode;
-		if (index<5) {neighborNode.pathIsReversingFromPrevNode=false;}
-		else {neighborNode.pathIsReversingFromPrevNode=true;}
+		neighborNode.vehicleIsReversingFromPrevNode=vehicleIsReversingFromBaseNode;
 
 		minHeap.bubbleNode(neighborNode);
 
-		if(ml) {//temp
-			if (neighborNode.pathIsReversingFromPrevNode) {printf("%s%f%s%f%s%f%s%f%s\n","plot([",neighborNode.x,",",baseNode.x,"],[",neighborNode.y,",",baseNode.y,"],'r')");}
-			else {printf("%s%f%s%f%s%f%s%f%s\n","plot([",neighborNode.x,",",baseNode.x,"],[",neighborNode.y,",",baseNode.y,"],'g')");}
-		}
+		//temp:
+		if (neighborNode.vehicleIsReversingFromPrevNode) {printf("%s%f%s%f%s%f%s%f%s\n","plot([",neighborNode.x,",",baseNode.x,"],[",neighborNode.y,",",baseNode.y,"],'r')");}
+		else {printf("%s%f%s%f%s%f%s%f%s\n","plot([",neighborNode.x,",",baseNode.x,"],[",neighborNode.y,",",baseNode.y,"],'g')");}
 	}
 }
 
-bool PathPlanning::checkIfaStarNodeIsTooCloseToObstacles(const aStarNode& node, double localPathAngleFromPreviousNode) const{
+bool PathPlanning::checkIfaStarNodeIsTooCloseToObstacles(const aStarNode& node, double localPathHeadingFromPreviousNode) const{
 	// This function checks if node is too close to any obstacle defined in obstacleSquaresOnGPU, and returns true if so
 	bool* isTooClosePointerOnGPU;
 	CUDA_CHECK_RETURN(cudaMalloc((void**)&isTooClosePointerOnGPU,sizeof(bool)));
 	CUDA_CHECK_RETURN(cudaMemset(isTooClosePointerOnGPU,0,sizeof(bool)));
 
 	int numberOfKernelBlocks = lidarExportData.currentNrOfObstacles/256+1;
-	checkIfaStarNodeIsTooCloseToObstaclesKernel<<<numberOfKernelBlocks,256>>>(node.x,node.y,localPathAngleFromPreviousNode,lidarExportData.obstacleSquaresOnGPU,lidarExportData.currentNrOfObstacles,isTooClosePointerOnGPU);
+	checkIfaStarNodeIsTooCloseToObstaclesKernel<<<numberOfKernelBlocks,256>>>(node.x,node.y,localPathHeadingFromPreviousNode,lidarExportData.obstacleSquaresOnGPU,lidarExportData.currentNrOfObstacles,isTooClosePointerOnGPU);
 
 	bool isToClose;
 	CUDA_CHECK_RETURN(cudaMemcpy(&isToClose,isTooClosePointerOnGPU,sizeof(bool),cudaMemcpyDeviceToHost));
@@ -487,11 +497,11 @@ PathPlanning::HashTable::~HashTable() {
 	clearHashTable();
 }
 
-int PathPlanning::HashTable::getIndex(int gridX, int gridY) const {
+int PathPlanning::HashTable::getIndex(int gridX, int gridY, int gridVehicleHeading) const {
 	// I tested this hasher in matlab, it is based on Java's hashCode(), and it gives pretty even results with GROUND_GRID_RESOLUTION
 	// between 0.01 and 0.2. X and Y are at this point always aligned with the ground grid
 
-	int hash = 999*abs(gridX)+998*abs(gridY)*abs(gridY);
+	int hash = 999*abs(gridX)+998*gridY*gridY+997*abs(gridVehicleHeading)*gridVehicleHeading*gridVehicleHeading;
 	return hash % HASH_TABLE_ENTRIES;
 }
 
@@ -513,10 +523,19 @@ void PathPlanning::HashTable::clearHashTable() {
 }
 
 
-PathPlanning::aStarNode& PathPlanning::HashTable::addAstarNode(float x, float y) {
+PathPlanning::aStarNode& PathPlanning::HashTable::addAstarNode(float baseNodeX, float baseNodeY, float newX, float newY, bool vehicleIsReversingToNode) {
 	// gridX and gridY are the rounded coordinates that match the ground grid resolution
-	int gridX = round(x/GROUND_GRID_RESOLUTION), gridY = round(y/GROUND_GRID_RESOLUTION), otherGridX,otherGridY;
-	int arrayIndex = getIndex(gridX,gridY);
+	int gridX = round(newX/GROUND_GRID_RESOLUTION),gridY = round(newY/GROUND_GRID_RESOLUTION),gridVehicleHeading,otherGridX,otherGridY,otherGridVehicleHeading,arrayIndex;
+	double angleFromBaseNode = atan2(gridX*GROUND_GRID_RESOLUTION-baseNodeX,gridY*GROUND_GRID_RESOLUTION-baseNodeY);
+	/* gridVehicleHeading is the angle going from {the vehicle centerline vector pointing forwards}
+	 * to {the vector going from baseNode to neihgborNode}. It is local in the coordinate system of the vehicle
+	 */
+
+	angleFromBaseNode += (vehicleIsReversingToNode ? M_PI : 0);
+	if (angleFromBaseNode > M_PI) {angleFromBaseNode-=2*M_PI;}
+	gridVehicleHeading = round(angleFromBaseNode/(2*M_PI/NR_OF_GRID_HEADINGS));
+
+	arrayIndex = getIndex(gridX,gridY,gridVehicleHeading);
 
 	// First check if node already is in the hashtable:
 	HashBucket* bucketPointer = hashArray[arrayIndex];
@@ -525,7 +544,8 @@ PathPlanning::aStarNode& PathPlanning::HashTable::addAstarNode(float x, float y)
 
 		otherGridX = round(bucketPointer->node.x/GROUND_GRID_RESOLUTION);
 		otherGridY = round(bucketPointer->node.y/GROUND_GRID_RESOLUTION);
-		if (gridX == otherGridX && gridY == otherGridY) {return bucketPointer->node;}
+		otherGridVehicleHeading = round(bucketPointer->node.vehicleHeadingAtNode/(2*M_PI/NR_OF_GRID_HEADINGS));
+		if (gridX == otherGridX && gridY == otherGridY && gridVehicleHeading == otherGridVehicleHeading) {return bucketPointer->node;}
 
 		bucketPointer=bucketPointer->nextBucket;
 	}
@@ -533,17 +553,15 @@ PathPlanning::aStarNode& PathPlanning::HashTable::addAstarNode(float x, float y)
 
 	bucketPointer=hashArray[arrayIndex];
 	if (bucketPointer==NULL) {
-		hashArray[arrayIndex]=new HashBucket(); //Everything (including all the fields of the aStarNode) set to zero
+		hashArray[arrayIndex]=new HashBucket(gridX*GROUND_GRID_RESOLUTION,gridY*GROUND_GRID_RESOLUTION,gridVehicleHeading*(2*M_PI/NR_OF_GRID_HEADINGS)); //Everything (including all the fields of the aStarNode) set to zero
 		bucketPointer=hashArray[arrayIndex];
 	}
 	else {
 		while (bucketPointer->nextBucket!=NULL) {bucketPointer = bucketPointer->nextBucket;} // Get the latest bucket in the linked list for the specified index:
-		bucketPointer->nextBucket = new HashBucket();
+		bucketPointer->nextBucket = new HashBucket(gridX*GROUND_GRID_RESOLUTION,gridY*GROUND_GRID_RESOLUTION,gridVehicleHeading*(2*M_PI/NR_OF_GRID_HEADINGS));
 		bucketPointer = bucketPointer->nextBucket;
 	}
 
-	bucketPointer->node.x=gridX*GROUND_GRID_RESOLUTION;
-	bucketPointer->node.y=gridY*GROUND_GRID_RESOLUTION;
 	return bucketPointer->node;
 }
 
@@ -626,7 +644,7 @@ PathPlanning::aStarNode* PathPlanning::MinHeap::popNode() {
 
 namespace {
 // Non member and cuda functions implementations:
-	__device__ bool checkIfPathPointIsTooCloseToObstacle(float pathPointX, float pathPointY, double localPathAngleFromPreviousNode,float obstacleX, float obstacleY) {
+	__device__ bool checkIfPathPointIsTooCloseToObstacle(float pathPointX, float pathPointY, double localPathHeadingFromPreviousNode,float obstacleX, float obstacleY) {
 		// This function returns true if the obstacle is to close to the vehicle, otherwise returns false
 		float rotatedObstacleX,rotatedObstacleY,minDistanceToObstacle;
 
@@ -638,8 +656,8 @@ namespace {
 		 */
 		obstacleX = obstacleX - pathPointX;
 		obstacleY = obstacleY - pathPointY;
-		rotatedObstacleX = abs(obstacleX * cos(-localPathAngleFromPreviousNode) - obstacleY * sin(-localPathAngleFromPreviousNode));
-		rotatedObstacleY = abs(obstacleX * sin(-localPathAngleFromPreviousNode) + obstacleY * cos(-localPathAngleFromPreviousNode));
+		rotatedObstacleX = abs(obstacleX * cos(-localPathHeadingFromPreviousNode) - obstacleY * sin(-localPathHeadingFromPreviousNode));
+		rotatedObstacleY = abs(obstacleX * sin(-localPathHeadingFromPreviousNode) + obstacleY * cos(-localPathHeadingFromPreviousNode));
 
 		if (rotatedObstacleX>RCV_WIDTH/2.0 && rotatedObstacleY>RCV_LENGTH/2.0) {
 			// minDistanceToObstacle is defined by the distance from {RCV_WIDTH/2.0,RCV_LENGHT/2.0} to the obstacle point
@@ -653,7 +671,7 @@ namespace {
 		return false;
 	}
 
-	__global__ void checkIfaStarNodeIsTooCloseToObstaclesKernel(float nodeX, float nodeY, double localPathAngleFromPreviousNode, const ObstaclePoint* obstacleSquaresOnGPU, int nrOfObstacles, bool* isTooClosePointerOnGPU) {
+	__global__ void checkIfaStarNodeIsTooCloseToObstaclesKernel(float nodeX, float nodeY, double localPathHeadingFromPreviousNode, const ObstaclePoint* obstacleSquaresOnGPU, int nrOfObstacles, bool* isTooClosePointerOnGPU) {
 		int myThreadID = blockIdx.x*blockDim.x+threadIdx.x;
 		float obstacleX,obstacleY;
 
@@ -661,7 +679,7 @@ namespace {
 			obstacleX = (obstacleSquaresOnGPU + 4*myThreadID)->x +GROUND_GRID_RESOLUTION/2.0;
 			obstacleY = (obstacleSquaresOnGPU + 4*myThreadID)->y +GROUND_GRID_RESOLUTION/2.0;
 
-			*(isTooClosePointerOnGPU) = checkIfPathPointIsTooCloseToObstacle(nodeX,nodeY,localPathAngleFromPreviousNode,obstacleX,obstacleY);
+			*(isTooClosePointerOnGPU) = checkIfPathPointIsTooCloseToObstacle(nodeX,nodeY,localPathHeadingFromPreviousNode,obstacleX,obstacleY);
 		}
 	}
 
@@ -693,20 +711,20 @@ namespace {
 		 */
 		int myThreadID = blockIdx.x*blockDim.x+threadIdx.x, myPathIndex = myThreadID/nrOfObstacles, myObstacleIndex = myThreadID-myPathIndex*nrOfObstacles;
 		float pathPointX,pathPointY,obstacleX,obstacleY;
-		double localPathAngleFromPreviousNode;
+		double localPathHeadingFromPreviousNode;
 
 		if (myThreadID < lengthOfPath*nrOfObstacles) {
 			// The positions of the nodes and obstacles are the center distances of their respective square
 			pathPointX = (pathXYonGPU+myPathIndex)->x;
 			pathPointY = (pathXYonGPU+myPathIndex)->y;
-			localPathAngleFromPreviousNode = (pathGPSOnGPU+myPathIndex)->headingFromPrevPathPoint - vehicleState.currentHeading;
+			localPathHeadingFromPreviousNode = (pathGPSOnGPU+myPathIndex)->headingFromPrevPathPoint - vehicleState.currentHeading;
 
 			obstacleX = (obstacleSquaresOnGPU + 4*myObstacleIndex)->x +GROUND_GRID_RESOLUTION/2.0;
 			obstacleY = (obstacleSquaresOnGPU + 4*myObstacleIndex)->y +GROUND_GRID_RESOLUTION/2.0;
 
-			*(isTooClosePointerOnGPU) = checkIfPathPointIsTooCloseToObstacle(pathPointX,pathPointY,localPathAngleFromPreviousNode,obstacleX,obstacleY);
+			*(isTooClosePointerOnGPU) = checkIfPathPointIsTooCloseToObstacle(pathPointX,pathPointY,localPathHeadingFromPreviousNode,obstacleX,obstacleY);
 
-			//TODO explain localPathAngleFromPreviousNode
+			//TODO explain localPathHeadingFromPreviousNode
 		}
 	}
 

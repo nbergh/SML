@@ -18,7 +18,6 @@ LidarProcessing::LidarProcessing() :
 	lidarExportData.lidarDataPoints = lidarDataPoints;
 	lidarExportData.obstacleSquares = obstacleSquares;
 	lidarExportData.obstacleSquaresOnGPU = obstacleSquaresOnGPU;
-	lidarExportData.currentNrOfObstacles = currentNrOfObstacles;
 
 	// Then initialize the UDP socket, test the connection, and start the UDP receiver thread:
 	lidarUDPReceiver = new LidarUDPReceiver(rawLidarData);
@@ -130,14 +129,11 @@ void LidarProcessing::processLidarData() {
 	identifyObstaclesInLidarData();
 
 	//Temp:
-	bool ml=false;
-	if (ml) {
-		for (int i=0;i<currentNrOfObstacles;i++) {
-			printf("%s%f%s%f%s%f%s%f%s\n","plot([",(obstacleSquares+4*i)->x,",",(obstacleSquares+4*i+1)->x,"],[",(obstacleSquares+4*i)->y,",",(obstacleSquares+4*i+1)->y,"],'r')");
-			printf("%s%f%s%f%s%f%s%f%s\n","plot([",(obstacleSquares+4*i)->x,",",(obstacleSquares+4*i+3)->x,"],[",(obstacleSquares+4*i)->y,",",(obstacleSquares+4*i+3)->y,"],'r')");
-			printf("%s%f%s%f%s%f%s%f%s\n","plot([",(obstacleSquares+4*i+1)->x,",",(obstacleSquares+4*i+2)->x,"],[",(obstacleSquares+4*i+1)->y,",",(obstacleSquares+4*i+2)->y,"],'r')");
-			printf("%s%f%s%f%s%f%s%f%s\n","plot([",(obstacleSquares+4*i+3)->x,",",(obstacleSquares+4*i+2)->x,"],[",(obstacleSquares+4*i+3)->y,",",(obstacleSquares+4*i+2)->y,"],'r')");
-		}
+	for (int i=0;i<currentNrOfObstacles;i++) {
+		printf("%s%f%s%f%s%f%s%f%s\n","plot([",(obstacleSquares+4*i)->x,",",(obstacleSquares+4*i+1)->x,"],[",(obstacleSquares+4*i)->y,",",(obstacleSquares+4*i+1)->y,"],'r')");
+		printf("%s%f%s%f%s%f%s%f%s\n","plot([",(obstacleSquares+4*i)->x,",",(obstacleSquares+4*i+3)->x,"],[",(obstacleSquares+4*i)->y,",",(obstacleSquares+4*i+3)->y,"],'r')");
+		printf("%s%f%s%f%s%f%s%f%s\n","plot([",(obstacleSquares+4*i+1)->x,",",(obstacleSquares+4*i+2)->x,"],[",(obstacleSquares+4*i+1)->y,",",(obstacleSquares+4*i+2)->y,"],'r')");
+		printf("%s%f%s%f%s%f%s%f%s\n","plot([",(obstacleSquares+4*i+3)->x,",",(obstacleSquares+4*i+2)->x,"],[",(obstacleSquares+4*i+3)->y,",",(obstacleSquares+4*i+2)->y,"],'r')");
 	}
 }
 
