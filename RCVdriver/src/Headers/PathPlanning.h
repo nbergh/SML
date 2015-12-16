@@ -58,7 +58,7 @@ class PathPlanning {
 			~MinHeap();
 
 			void clearMinHeap();
-			bool addNode(aStarNode& node); // Returns false if the heap is full. Also stores heapArrayIndex in the aStarNode
+			void addNode(aStarNode& node); // Returns false if the heap is full. Also stores heapArrayIndex in the aStarNode
 			void bubbleNode(aStarNode& node); // Updates the heap based on the new (lower) heuristic, and updates heapArrayIndex in the node
 			aStarNode* popNode();
 			int getAvailableSpace() {return HEAP_SIZE-currentNrOfNodesInHeap;}
@@ -84,8 +84,8 @@ class PathPlanning {
 	bool translateMicroPathToXYandCheckIfMicroPathIsTooCloseToObstacles() const;
 	bool generateMicroPath(float targetX, float targetY, double localTargetHeading);
 	void discoverNeighbor(aStarNode& baseNode, const aStarNode& targetNode, int index);
-	bool checkIfaStarNodeIsTooCloseToObstacles(const aStarNode& node, double localPathHeadingFromPreviousNode) const;
-	double getHeadingForMicroPathTarget();
+	bool checkIfaStarNodeIsTooCloseToObstacles(const aStarNode& node, double pathCourse) const;
+	double getTargetHeadingForMicroPath();
 	void clearAllPaths(bool includeMacroPath);
 
 	public:

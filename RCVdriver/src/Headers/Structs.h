@@ -44,7 +44,7 @@ struct PathPointInGPScords {
 	 */
 	GPSposition position;
 	float latDistanceFromPrevPathPoint,longDistanceFromPrevPathPoint; // The distance in meters from prevPathPoint to this point, lat and long
-	double headingFromPrevPathPoint;
+	double courseFromPreviousPathPoint;
 	bool isReversingFromPrevNode;
 };
 struct VehicleState {
