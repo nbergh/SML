@@ -32,9 +32,10 @@ int main(void)
 	// Start the main controller thread:
 	while (!input.getExitProgramBool()) {
 		// runMainControllerLoop controller loop
+		sleep(1); // TODO make dynamic
 		lidarProcessing.processLidarData(); // Process the lidar data from the sensors
 		pathPlanning.updatePathAndControlSignals(); // Update the path and send control signals
-		sleep(1); // TODO make dynamic
+
 	}
 }
 

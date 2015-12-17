@@ -83,8 +83,8 @@ class PathPlanning {
 	void translateMacroPathToXY();
 	bool translateMicroPathToXYandCheckIfMicroPathIsTooCloseToObstacles() const;
 	bool generateMicroPath(float targetX, float targetY, double localTargetHeading);
-	void discoverNeighbor(aStarNode& baseNode, const aStarNode& targetNode, int index);
-	bool checkIfaStarNodeIsTooCloseToObstacles(const aStarNode& node, double pathCourse) const;
+	void discoverNeighbor(aStarNode& baseNode, const float targetX, const float targetY, const double targetHeading, const int index);
+	bool checkIfaStarNodeIsTooCloseToObstacles(const aStarNode& node) const;
 	double getTargetHeadingForMicroPath();
 	void clearAllPaths(bool includeMacroPath);
 
