@@ -5,7 +5,7 @@
 
 #define HEAP_SIZE 20000 // The heap has limited space
 #define HASH_TABLE_ENTRIES 20000 // The hash table has unlimited space, but a limited number of possible hashes
-#define NR_OF_GRID_HEADINGS 100 //
+#define NR_OF_GRID_HEADINGS 20 //
 
 class PathPlanning {
 	struct aStarNode {
@@ -19,12 +19,13 @@ class PathPlanning {
 		 * along its longitudinal centerline}. It is not a heading, since it has no relation
 		 * with north, and only has a meaning in the vehicle local coordinate system
 		 */
-		aStarNode(float x, float y, float vehicleHeadingAtNode) : x(x), y(y), vehicleHeadingAtNode(vehicleHeadingAtNode) {
+		aStarNode(float x, float y, double vehicleHeadingAtNode) : x(x), y(y), vehicleHeadingAtNode(vehicleHeadingAtNode) {
 			distanceFromStartNode=0;heuristic=0;isOnOpenSet=false,isOnClosedSet=false,vehicleIsReversingFromPrevNode=0;
 			heapArrayIndex=0,previousNodeInPath=NULL;
 		}
 
-		const float x, y, vehicleHeadingAtNode;
+		const float x, y;
+		double vehicleHeadingAtNode;
 		float distanceFromStartNode,heuristic;
 		bool isOnOpenSet, isOnClosedSet, vehicleIsReversingFromPrevNode;
 		int heapArrayIndex;
@@ -32,7 +33,7 @@ class PathPlanning {
 	};
 	class HashTable {
 		struct HashBucket {
-			HashBucket(float x, float y, float localHeadingFromPrevNode) : node(x,y,localHeadingFromPrevNode) {nextBucket=NULL;}
+			HashBucket(float x, float y, double vehicleHeadingAtNode) : node(x,y,vehicleHeadingAtNode) {nextBucket=NULL;}
 			aStarNode node; // aStarNodes are stored here
 			HashBucket* nextBucket; // A linked list of buckets that share the same index
 		};
@@ -65,12 +66,11 @@ class PathPlanning {
 	};
 
 	const LidarExportData& lidarExportData;
-	const VehicleState& vehicleState;
+	const VehiclePosition& vehiclePosition;
 	VehicleStatus& vehicleStatus;
 	PathExportData pathExportData;
 	HashTable hashTable;
 	MinHeap minHeap;
-
 
 	PathPointInGPScords* macroPathGPS; // The main GPS path (start to goal) as a linked list
 	PathPointInGPScords* microPathGPS; // The path to the next point in the mainGPSpath as a linked list
@@ -84,12 +84,12 @@ class PathPlanning {
 	bool translateMicroPathToXYandCheckIfMicroPathIsTooCloseToObstacles() const;
 	bool generateMicroPath(float targetX, float targetY, double localTargetHeading);
 	void discoverNeighbor(aStarNode& baseNode, const float targetX, const float targetY, const double targetHeading, const int index);
-	bool checkIfaStarNodeIsTooCloseToObstacles(const aStarNode& node) const;
+	bool checkIfaStarNodeIsTooCloseToObstacles(const aStarNode& node, const double vehicleHeadingAtNode) const;
 	double getTargetHeadingForMicroPath();
 	void clearAllPaths(bool includeMacroPath);
 
 	public:
-		PathPlanning(const LidarExportData& lidarExportData, const VehicleState& vehicleState, VehicleStatus& vehicleStatus);
+		PathPlanning(const LidarExportData& lidarExportData, const VehiclePosition& vehiclePosition, VehicleStatus& vehicleStatus);
 		~PathPlanning();
 
 		void updatePathAndControlSignals();

@@ -10,11 +10,11 @@ namespace {
 }
 
 
-LidarProcessing::LidarProcessing() :
-		lidarExportData(currentNrOfObstacles) {
+LidarProcessing::LidarProcessing() {
 	// First allocate all data needed by this class:
 	allocateMemory();
 
+	lidarExportData.currentNrOfObstacles=0;
 	lidarExportData.lidarDataPoints = lidarDataPoints;
 	lidarExportData.obstacleSquares = obstacleSquares;
 	lidarExportData.obstacleSquaresOnGPU = obstacleSquaresOnGPU;
@@ -37,8 +37,6 @@ void LidarProcessing::allocateMemory() {
 	 * in one revolution will fit inside the buffer, creating holes when displaying the graphics. 75 packets
 	 * contains data for 28800 lidar points
 	 */
-
-	currentNrOfObstacles=0;
 
 	// First is rawLidarData. It is a byte array of raw UDP data (minus UDP headers and factory bytes), representing 75 UDP packets (one revolution of the lidar sensor). Size is 1200*75 = 90000 bytes
 	sizeOfRawLidarData = 90000;
@@ -71,6 +69,21 @@ void LidarProcessing::freeMemory() const {
 	CUDA_CHECK_RETURN(cudaFree(obstacleSquaresOnGPU));
 	CUDA_CHECK_RETURN(cudaFree(obstacleMatrixForMaxZOnGPU));
 	CUDA_CHECK_RETURN(cudaFree(obstacleMatrixForMinZOnGPU));
+}
+
+#include <stdio.h> //temp
+void LidarProcessing::processLidarData() {
+	translateLidarDataFromRawToXYZ();
+	identifyObstaclesInLidarData();
+
+
+	//Temp:
+//	for (int i=0;i<lidarExportData.currentNrOfObstacles;i++) {
+//		printf("%s%f%s%f%s%f%s%f%s\n","plot([",(obstacleSquares+4*i)->x,",",(obstacleSquares+4*i+1)->x,"],[",(obstacleSquares+4*i)->y,",",(obstacleSquares+4*i+1)->y,"],'r')");
+//		printf("%s%f%s%f%s%f%s%f%s\n","plot([",(obstacleSquares+4*i)->x,",",(obstacleSquares+4*i+3)->x,"],[",(obstacleSquares+4*i)->y,",",(obstacleSquares+4*i+3)->y,"],'r')");
+//		printf("%s%f%s%f%s%f%s%f%s\n","plot([",(obstacleSquares+4*i+1)->x,",",(obstacleSquares+4*i+2)->x,"],[",(obstacleSquares+4*i+1)->y,",",(obstacleSquares+4*i+2)->y,"],'r')");
+//		printf("%s%f%s%f%s%f%s%f%s\n","plot([",(obstacleSquares+4*i+3)->x,",",(obstacleSquares+4*i+2)->x,"],[",(obstacleSquares+4*i+3)->y,",",(obstacleSquares+4*i+2)->y,"],'r')");
+//	}
 }
 
 void LidarProcessing::translateLidarDataFromRawToXYZ() {
@@ -117,24 +130,10 @@ void LidarProcessing::identifyObstaclesInLidarData() {
 	CUDA_CHECK_RETURN(cudaMemcpy(obstacleSquares, obstacleSquaresOnGPU, sizeOfObstacleSquares, cudaMemcpyDeviceToHost));
 
 	// Set the number of obstacles idenitified in lidarMemoryPointers.currentNrOfObstacles	__global__ void identifyObstacles(const int* obstacleMatrixForMaxZOnGPU,const int* obstacleMatrixForMinZOnGPU,ObstaclePoint* obstacleSquaresOnGPU,int* deviceObstacleArrayIndex,int numberOfMatrixFieldsPerSide)
-	CUDA_CHECK_RETURN(cudaMemcpy(&currentNrOfObstacles, deviceObstacleArrayIndex, sizeof(int), cudaMemcpyDeviceToHost));
+	CUDA_CHECK_RETURN(cudaMemcpy(&lidarExportData.currentNrOfObstacles, deviceObstacleArrayIndex, sizeof(int), cudaMemcpyDeviceToHost));
 	CUDA_CHECK_RETURN(cudaFree(deviceObstacleArrayIndex)); // TODO this shouldnt be done every iteration
 
 	cudaDeviceSynchronize();
-}
-
-#include <stdio.h> //temp
-void LidarProcessing::processLidarData() {
-	translateLidarDataFromRawToXYZ();
-	identifyObstaclesInLidarData();
-
-	//Temp:
-	for (int i=0;i<currentNrOfObstacles;i++) {
-		printf("%s%f%s%f%s%f%s%f%s\n","plot([",(obstacleSquares+4*i)->x,",",(obstacleSquares+4*i+1)->x,"],[",(obstacleSquares+4*i)->y,",",(obstacleSquares+4*i+1)->y,"],'r')");
-		printf("%s%f%s%f%s%f%s%f%s\n","plot([",(obstacleSquares+4*i)->x,",",(obstacleSquares+4*i+3)->x,"],[",(obstacleSquares+4*i)->y,",",(obstacleSquares+4*i+3)->y,"],'r')");
-		printf("%s%f%s%f%s%f%s%f%s\n","plot([",(obstacleSquares+4*i+1)->x,",",(obstacleSquares+4*i+2)->x,"],[",(obstacleSquares+4*i+1)->y,",",(obstacleSquares+4*i+2)->y,"],'r')");
-		printf("%s%f%s%f%s%f%s%f%s\n","plot([",(obstacleSquares+4*i+3)->x,",",(obstacleSquares+4*i+2)->x,"],[",(obstacleSquares+4*i+3)->y,",",(obstacleSquares+4*i+2)->y,"],'r')");
-	}
 }
 
 namespace { // Limit scope to translation unit
@@ -236,7 +235,7 @@ namespace { // Limit scope to translation unit
 
 			myMatrixPointerOffset = myMatrixXcoord * GROUND_GRID_FIELDS_PER_SIDE + myMatrixYcoord;
 
-			// Write to matrices:
+			// Write to matrices. Remember that max field for a matrix may be negative, and min field for a matrix may be positive:
 			atomicCAS((obstacleMatrixForMaxZOnGPU+myMatrixPointerOffset),0,myMatrixZval); // Check if a value has been written to the obstacle matrix first
 			atomicMax((obstacleMatrixForMaxZOnGPU+myMatrixPointerOffset),myMatrixZval); // Then write the largest of myMatrixZval and whatever is written on the obstacle matrix
 			atomicCAS((obstacleMatrixForMinZOnGPU+myMatrixPointerOffset),0,myMatrixZval);

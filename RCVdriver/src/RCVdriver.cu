@@ -25,7 +25,7 @@ int main(void)
 	// Initialize the main objects:
 	LidarProcessing lidarProcessing = LidarProcessing();
 	PositionEstimation positionEstimation = PositionEstimation();
-	PathPlanning pathPlanning = PathPlanning(lidarProcessing.getLidarExportData(),positionEstimation.getCurrentVehicleState(),vehicleStatus);
+	PathPlanning pathPlanning = PathPlanning(lidarProcessing.getLidarExportData(),positionEstimation.getCurrentVehiclePosition(),vehicleStatus);
 //	Graphics graphics = Graphics(lidarProcessing.getLidarExportData(),pathPlanning.getPathExportData());
 	Input input = Input(vehicleStatus,pathPlanning);
 
@@ -34,6 +34,7 @@ int main(void)
 		// runMainControllerLoop controller loop
 		sleep(1); // TODO make dynamic
 		lidarProcessing.processLidarData(); // Process the lidar data from the sensors
+		positionEstimation.updatePosition(); // Update the position (VehiclePosition)
 		pathPlanning.updatePathAndControlSignals(); // Update the path and send control signals
 
 	}

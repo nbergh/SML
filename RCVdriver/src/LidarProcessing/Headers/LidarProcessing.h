@@ -15,7 +15,6 @@ class LidarProcessing {
 	// Members:
 	LidarUDPReceiver* lidarUDPReceiver;
 	LidarExportData lidarExportData;
-	int currentNrOfObstacles;
 
 	void allocateMemory();
 	void freeMemory() const;

@@ -16,12 +16,9 @@ struct PathPointInLocalXY {
 	unsigned char r,b,g; // Colors of the point
 };
 struct LidarExportData {
-	LidarExportData(int& currentNrOfObstacles) :
-		currentNrOfObstacles(currentNrOfObstacles),lidarDataPoints(0),obstacleSquares(0),obstacleSquaresOnGPU(0) {}
-
 	LidarDataPoint* lidarDataPoints;
 	ObstaclePoint* obstacleSquares,* obstacleSquaresOnGPU;
-	int& currentNrOfObstacles;
+	int currentNrOfObstacles;
 };
 struct PathExportData {
 	PathExportData(int lengthOfMacroPath,int currentIndexInMacroPath,int lengthOfMicroPath,int currentIndexInMicroPath) :
@@ -47,7 +44,7 @@ struct PathPointInGPScords {
 	double courseFromPreviousPathPoint;
 	bool isReversingFromPrevNode;
 };
-struct VehicleState {
+struct VehiclePosition {
 	// The position and heading of the vehicle
 	GPSposition currentPosition;
 	double currentHeading;
