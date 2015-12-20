@@ -30,14 +30,17 @@ PathPlanning::PathPlanning(const LidarExportData& lidarExportData,const VehicleP
 		vehicleStatus(vehicleStatus),pathExportData(lengthOfMacroPath,currentIndexInMacroPath,lengthOfMicroPath,currentIndexInMicroPath),
 		minHeap(),hashTable() {
 
-	this->macroPathGPS=NULL;
-	this->microPathGPS=NULL;
-	this->microPathXY=NULL;
-	this->macroPathXY=NULL;
-	this->lengthOfMacroPath=0;
-	this->lengthOfMicroPath=0;
-	this->currentIndexInMacroPath=0;
-	this->currentIndexInMicroPath=0;
+	macroPathGPS=NULL;
+	microPathGPS=NULL;
+	microPathXY=NULL;
+	macroPathXY=NULL;
+	lengthOfMacroPath=0;
+	lengthOfMicroPath=0;
+	currentIndexInMacroPath=0;
+	currentIndexInMicroPath=0;
+
+	macroPathFilePath=NULL;
+	loadNewMacroPathFlag=false;
 }
 
 PathPlanning::~PathPlanning() {
@@ -51,7 +54,8 @@ void PathPlanning::updatePathAndControlSignals() {
 	 * is the path the vehicle will follow and adjusting its control signals to. MicroPath will be replanned
 	 * if an obstacle is detected along its path
 	 */
-	if (lengthOfMacroPath==0) { // MacroPath has not been set, so return
+	if (loadNewMacroPathFlag) {loadNewMacroPath();}
+	else if (lengthOfMacroPath==0) { // MacroPath has not been set, so return
 		vehicleStatus.macroPathHasBeenSet=false;
 		vehicleStatus.isRunning=false;
 		return;
@@ -65,9 +69,7 @@ void PathPlanning::updatePathAndControlSignals() {
 		vehicleStatus.isAbleToGenerateMicroPath=false;
 		return;
 	}
-
 	if (updatePathIndexes()) {return;}
-
 	// Update the path indexes, and return if the macroPath has been traversed
 	vehicleStatus.isAbleToGenerateMicroPath=true;
 
@@ -126,8 +128,8 @@ bool PathPlanning::updatePathIndexes() {
 				gpsPointDeltaLongFromPrevGPSpoint = macroPathGPS[currentIndexInMacroPath].longDistanceFromPrevPathPoint;
 				currentPathCourse = macroPathGPS[currentIndexInMacroPath].courseFromPreviousPathPoint;
 
-				vehicleRotatedY = rotateAndGetY(vehicleDeltaLatFromPrevGPSpoint,vehicleDeltaLongFromPrevGPSpoint,currentPathCourse);
-				gpsPointRotatedY = rotateAndGetY(gpsPointDeltaLatFromPrevGPSpoint,gpsPointDeltaLongFromPrevGPSpoint,currentPathCourse);
+				vehicleRotatedY = rotateAndGetY(vehicleDeltaLongFromPrevGPSpoint,vehicleDeltaLatFromPrevGPSpoint,currentPathCourse);
+				gpsPointRotatedY = rotateAndGetY(gpsPointDeltaLongFromPrevGPSpoint,gpsPointDeltaLatFromPrevGPSpoint,currentPathCourse);
 
 				if (vehicleRotatedY>gpsPointRotatedY) {currentIndexInMacroPath++;}
 				else {break;} // If false, the currentIndexInMacroPath is still ahead of the vehicle, and should be the current target for the microPath
@@ -145,8 +147,8 @@ bool PathPlanning::updatePathIndexes() {
 		gpsPointDeltaLongFromPrevGPSpoint = microPathGPS[currentIndexInMicroPath].longDistanceFromPrevPathPoint;
 		currentPathCourse = microPathGPS[currentIndexInMicroPath].courseFromPreviousPathPoint;
 
-		vehicleRotatedY = rotateAndGetY(vehicleDeltaLatFromPrevGPSpoint,vehicleDeltaLongFromPrevGPSpoint,currentPathCourse);
-		gpsPointRotatedY = rotateAndGetY(gpsPointDeltaLatFromPrevGPSpoint,gpsPointDeltaLongFromPrevGPSpoint,currentPathCourse);
+		vehicleRotatedY = rotateAndGetY(vehicleDeltaLongFromPrevGPSpoint,vehicleDeltaLatFromPrevGPSpoint,currentPathCourse);
+		gpsPointRotatedY = rotateAndGetY(gpsPointDeltaLongFromPrevGPSpoint,gpsPointDeltaLatFromPrevGPSpoint,currentPathCourse);
 
 		if (vehicleRotatedY>gpsPointRotatedY) {currentIndexInMicroPath++;}
 		else {break;}
@@ -221,16 +223,17 @@ bool PathPlanning::translateMicroPathToXYandCheckIfMicroPathIsTooCloseToObstacle
 	return nodeIsColliding;
 }
 
-void PathPlanning::setMacroPath(const char* filePath) {
+void PathPlanning::loadNewMacroPath() {
 	// Reset paths first
 	clearAllPaths(true);
+	loadNewMacroPathFlag=false;
 
 	// This function is called by Input when a new path is loaded. The filepath to the pathfile is the parameter
 	FILE *fp;
 	char line[60];
 
-	if ((fp = fopen(filePath,"rt"))  == NULL) {
-		printf("%s %s %s\n","Unable to open path file:",filePath, strerror(errno));
+	if ((fp = fopen(macroPathFilePath,"rt"))  == NULL) {
+		printf("%s %s %s\n","Unable to open path file:",macroPathFilePath, strerror(errno));
 		return;
 	}
 
@@ -304,12 +307,12 @@ bool PathPlanning::generateMicroPath(const float targetX, const float targetY, c
 		baseNode->isOnOpenSet=false;
 
 		iter++;
-		if (iter==10000) {
-			gettimeofday(&endTime,NULL);
-			printf("%s%ld\n","time:",endTime.tv_usec-startTime.tv_usec);
-			printf("%s%d","minheap av space:",minHeap.getAvailableSpace());
-			exit(0);
-		}
+//		if (iter==10000) {
+//			gettimeofday(&endTime,NULL);
+//			printf("%s%ld\n","time:",endTime.tv_usec-startTime.tv_usec);
+//			printf("%s%d","minheap av space:",minHeap.getAvailableSpace());
+//			exit(0);
+//		}
 
 		// Check if baseNode is close enough to the target:
 		baseNodeDistanceToTarget = sqrt((baseNode->x-targetX)*(baseNode->x-targetX)+(baseNode->y-targetY)*(baseNode->y-targetY));
@@ -322,20 +325,16 @@ bool PathPlanning::generateMicroPath(const float targetX, const float targetY, c
 				goalNode->previousNodeInPath = baseNode;
 				baseNode = goalNode;
 			}
-			gettimeofday(&endTime,NULL);
-			printf("%s%ld\n","pf, time:",endTime.tv_usec-startTime.tv_usec);
-			printf("%s%d\n","iter:",iter);
-			printf("%s%d","minheap av space:",minHeap.getAvailableSpace());
-			exit(0);
 			break;
 		}
 
 		for (int i=0;i<10;i++) {discoverNeighbor(*baseNode,targetX,targetY,targetHeading,i);}
 
 		baseNode = minHeap.popNode();
-		if (baseNode==NULL || minHeap.getAvailableSpace() < 10) {
-			return false;
-		} // MinHeap is empty or full, so no path could be found
+
+		// If minheap is full or empty, or if the pathplanner has taken more than 100 msec to find a path, then a path could not be found, so return:
+		gettimeofday(&endTime,NULL);
+		if (baseNode==NULL || minHeap.getAvailableSpace() < 10) {return false;}// || endTime.tv_usec-startTime.tv_usec > 100000) {return false;}
 	}
 
 	// Path found, now create microPathGPS and microPathXY
@@ -362,8 +361,8 @@ bool PathPlanning::generateMicroPath(const float targetX, const float targetY, c
 		 * and y counter clockwise by heading makes y align with true north, and x align with true east.
 		 * Scale those and you get latc and longc
 		 */
-		microPathGPS[i].position.latc = vehiclePosition.currentPosition.latc + rotateAndGetY(currentNode->x,currentNode->y,-vehiclePosition.currentHeading) * (1.0/LENGTH_OF_ONE_LAT_DEGREE_IN_METERS);
-		microPathGPS[i].position.longc = vehiclePosition.currentPosition.longc + rotateAndGetX(currentNode->x,currentNode->y,-vehiclePosition.currentHeading) * (1.0/LENGTH_OF_ONE_LONG_DEGREE_IN_METERS);
+		microPathGPS[i].position.latc = vehiclePosition.currentPosition.latc + rotateAndGetY(currentNode->x,currentNode->y,vehiclePosition.currentHeading) * (1.0/LENGTH_OF_ONE_LAT_DEGREE_IN_METERS);
+		microPathGPS[i].position.longc = vehiclePosition.currentPosition.longc + rotateAndGetX(currentNode->x,currentNode->y,vehiclePosition.currentHeading) * (1.0/LENGTH_OF_ONE_LONG_DEGREE_IN_METERS);
 		microPathGPS[i].courseFromPreviousPathPoint = vehiclePosition.currentHeading + atan2(currentNode->x-currentNode->previousNodeInPath->x,currentNode->y-currentNode->previousNodeInPath->y);
 		microPathGPS[i].latDistanceFromPrevPathPoint = rotateAndGetY(currentNode->x-currentNode->previousNodeInPath->x,currentNode->y-currentNode->previousNodeInPath->y,vehiclePosition.currentHeading);
 		microPathGPS[i].longDistanceFromPrevPathPoint = rotateAndGetX(currentNode->x-currentNode->previousNodeInPath->x,currentNode->y-currentNode->previousNodeInPath->y,vehiclePosition.currentHeading);
@@ -374,9 +373,9 @@ bool PathPlanning::generateMicroPath(const float targetX, const float targetY, c
 		if (currentNode->vehicleIsReversingFromPrevNode) {microPathXY[i].r=255;} // Set colors of the path; red for reversing, green otherwise
 		else {microPathXY[i].g=255;}
 
-		// temp
-//		if (!currentNode->vehicleIsReversingFromPrevNode) {printf("%s%f%s%f%s%f%s%f%s\n","quiver(",currentNode->x,",",currentNode->y,",",currentNode->previousNodeInPath->x-currentNode->x,",",currentNode->previousNodeInPath->y-currentNode->y,",0,'g')");}
-//		else {printf("%s%f%s%f%s%f%s%f%s\n","quiver(",currentNode->x,",",currentNode->y,",",currentNode->previousNodeInPath->x-currentNode->x,",",currentNode->previousNodeInPath->y-currentNode->y,",0,'r')");}
+		// Path debugging:
+		if (!currentNode->vehicleIsReversingFromPrevNode) {printf("%s%f%s%f%s%f%s%f%s\n","quiver(",currentNode->x,",",currentNode->y,",",currentNode->previousNodeInPath->x-currentNode->x,",",currentNode->previousNodeInPath->y-currentNode->y,",0,'g')");}
+		else {printf("%s%f%s%f%s%f%s%f%s\n","quiver(",currentNode->x,",",currentNode->y,",",currentNode->previousNodeInPath->x-currentNode->x,",",currentNode->previousNodeInPath->y-currentNode->y,",0,'r')");}
 
 		currentNode=currentNode->previousNodeInPath;
 	}
@@ -446,13 +445,13 @@ void PathPlanning::discoverNeighbor(aStarNode& baseNode, const float targetX, co
 
 		minHeap.addNode(neighborNode);
 
-		//temp:
-//		if (neighborNode.vehicleIsReversingFromPrevNode) {printf("%s%f%s%f%s%f%s%f%s\n","plot([",neighborNode.x,",",baseNode.x,"],[",neighborNode.y,",",baseNode.y,"],'r')");}
-//		else {printf("%s%f%s%f%s%f%s%f%s\n","plot([",neighborNode.x,",",baseNode.x,"],[",neighborNode.y,",",baseNode.y,"],'g')");}
+		// Path debugging:
+		if (neighborNode.vehicleIsReversingFromPrevNode) {printf("%s%f%s%f%s%f%s%f%s\n","plot([",neighborNode.x,",",baseNode.x,"],[",neighborNode.y,",",baseNode.y,"],'r')");}
+		else {printf("%s%f%s%f%s%f%s%f%s\n","plot([",neighborNode.x,",",baseNode.x,"],[",neighborNode.y,",",baseNode.y,"],'g')");}
 	}
 	else if (distanceFromStartNode < neighborNode.distanceFromStartNode) {
-		//temp:
-//		printf("%s%f%s%f%s%f%s%f%s\n","plot([",neighborNode.x,",",neighborNode.previousNodeInPath->x,"],[",neighborNode.y,",",neighborNode.previousNodeInPath->y,"],'w')");
+		// Path debugging:
+		printf("%s%f%s%f%s%f%s%f%s\n","plot([",neighborNode.x,",",neighborNode.previousNodeInPath->x,"],[",neighborNode.y,",",neighborNode.previousNodeInPath->y,"],'w')");
 
 		neighborNode.vehicleHeadingAtNode=vehicleHeadingAtNode;
 		neighborNode.distanceFromStartNode = distanceFromStartNode;
@@ -462,9 +461,9 @@ void PathPlanning::discoverNeighbor(aStarNode& baseNode, const float targetX, co
 
 		minHeap.bubbleNode(neighborNode);
 
-		//temp:
-//		if (neighborNode.vehicleIsReversingFromPrevNode) {printf("%s%f%s%f%s%f%s%f%s\n","plot([",neighborNode.x,",",baseNode.x,"],[",neighborNode.y,",",baseNode.y,"],'r')");}
-//		else {printf("%s%f%s%f%s%f%s%f%s\n","plot([",neighborNode.x,",",baseNode.x,"],[",neighborNode.y,",",baseNode.y,"],'g')");}
+		// Path debugging:
+		if (neighborNode.vehicleIsReversingFromPrevNode) {printf("%s%f%s%f%s%f%s%f%s\n","plot([",neighborNode.x,",",baseNode.x,"],[",neighborNode.y,",",baseNode.y,"],'r')");}
+		else {printf("%s%f%s%f%s%f%s%f%s\n","plot([",neighborNode.x,",",baseNode.x,"],[",neighborNode.y,",",baseNode.y,"],'g')");}
 	}
 }
 

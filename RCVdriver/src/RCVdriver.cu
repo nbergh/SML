@@ -8,14 +8,14 @@
  ============================================================================
  */
 
-#include <unistd.h>
-
 #include "LidarProcessing/Headers/LidarProcessing.h"
 #include "PositionEstimation/Headers/PositionEstimation.h"
 #include "Headers/PathPlanning.h"
-#include "Headers/Input.h"
 #include "Headers/Graphics.h"
+#include "Headers/Input.h"
 #include "Headers/Parameters.h"
+
+#include <unistd.h>
 
 int main(void)
 {

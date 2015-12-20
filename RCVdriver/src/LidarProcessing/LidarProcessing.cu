@@ -2,11 +2,14 @@
 #include "../Headers/Parameters.h"
 #include "../Headers/CudaErrorCheckFunctions.h"
 
+#include <stdio.h>
+
 namespace {
-	//CUDA kernels:
+	//CUDA kernels and fields:
+	__device__ int currentNrOfObstaclesOnGPU;
 	__global__ void translateLidarDataFromRawToXYZkernel(char* rawLidarDataOnGPU, LidarDataPoint *lidarPointsOnGPU);
 	__global__ void writeMaxAndMinZToMatrices(int* obstacleMatrixForMaxZOnGPU,int* obstacleMatrixForMinZOnGPU,const LidarDataPoint* lidarDataPointsOnGPU);
-	__global__ void identifyObstacles(const int* obstacleMatrixForMaxZOnGPU,const int* obstacleMatrixForMinZOnGPU,ObstaclePoint* obstacleSquaresOnGPU,int* deviceObstacleArrayIndex);
+	__global__ void identifyObstacles(const int* obstacleMatrixForMaxZOnGPU,const int* obstacleMatrixForMinZOnGPU,ObstaclePoint* obstacleSquaresOnGPU);
 }
 
 
@@ -71,19 +74,18 @@ void LidarProcessing::freeMemory() const {
 	CUDA_CHECK_RETURN(cudaFree(obstacleMatrixForMinZOnGPU));
 }
 
-#include <stdio.h> //temp
 void LidarProcessing::processLidarData() {
 	translateLidarDataFromRawToXYZ();
 	identifyObstaclesInLidarData();
 
 
-	//Temp:
-//	for (int i=0;i<lidarExportData.currentNrOfObstacles;i++) {
-//		printf("%s%f%s%f%s%f%s%f%s\n","plot([",(obstacleSquares+4*i)->x,",",(obstacleSquares+4*i+1)->x,"],[",(obstacleSquares+4*i)->y,",",(obstacleSquares+4*i+1)->y,"],'r')");
-//		printf("%s%f%s%f%s%f%s%f%s\n","plot([",(obstacleSquares+4*i)->x,",",(obstacleSquares+4*i+3)->x,"],[",(obstacleSquares+4*i)->y,",",(obstacleSquares+4*i+3)->y,"],'r')");
-//		printf("%s%f%s%f%s%f%s%f%s\n","plot([",(obstacleSquares+4*i+1)->x,",",(obstacleSquares+4*i+2)->x,"],[",(obstacleSquares+4*i+1)->y,",",(obstacleSquares+4*i+2)->y,"],'r')");
-//		printf("%s%f%s%f%s%f%s%f%s\n","plot([",(obstacleSquares+4*i+3)->x,",",(obstacleSquares+4*i+2)->x,"],[",(obstacleSquares+4*i+3)->y,",",(obstacleSquares+4*i+2)->y,"],'r')");
-//	}
+	// Lidar debugging:
+	for (int i=0;i<lidarExportData.currentNrOfObstacles;i++) {
+		printf("%s%f%s%f%s%f%s%f%s\n","plot([",(obstacleSquares+4*i)->x,",",(obstacleSquares+4*i+1)->x,"],[",(obstacleSquares+4*i)->y,",",(obstacleSquares+4*i+1)->y,"],'r')");
+		printf("%s%f%s%f%s%f%s%f%s\n","plot([",(obstacleSquares+4*i)->x,",",(obstacleSquares+4*i+3)->x,"],[",(obstacleSquares+4*i)->y,",",(obstacleSquares+4*i+3)->y,"],'r')");
+		printf("%s%f%s%f%s%f%s%f%s\n","plot([",(obstacleSquares+4*i+1)->x,",",(obstacleSquares+4*i+2)->x,"],[",(obstacleSquares+4*i+1)->y,",",(obstacleSquares+4*i+2)->y,"],'r')");
+		printf("%s%f%s%f%s%f%s%f%s\n","plot([",(obstacleSquares+4*i+3)->x,",",(obstacleSquares+4*i+2)->x,"],[",(obstacleSquares+4*i+3)->y,",",(obstacleSquares+4*i+2)->y,"],'r')");
+	}
 }
 
 void LidarProcessing::translateLidarDataFromRawToXYZ() {
@@ -112,26 +114,21 @@ void LidarProcessing::identifyObstaclesInLidarData() {
 	 * share a similar x and y position but a different z position", e.g. some kind of vertical shape.
 	 */
 
-	int numberOfMatrixFields = GROUND_GRID_FIELDS_PER_SIDE * GROUND_GRID_FIELDS_PER_SIDE;
-	int numberOfBlocksForMatrixOperations = numberOfMatrixFields/256+1;
-	int *deviceObstacleArrayIndex; // A pointer to a global variable used by the kernels
-	CUDA_CHECK_RETURN(cudaMalloc((void**)&deviceObstacleArrayIndex,sizeof(int))); // Allocate deviceObstacleArrayIndex on device
-	CUDA_CHECK_RETURN(cudaMemset(deviceObstacleArrayIndex,0,sizeof(int))); // Set it to zero
+	lidarExportData.currentNrOfObstacles=0;
+	int numberOfMatrixFields = GROUND_GRID_FIELDS_PER_SIDE * GROUND_GRID_FIELDS_PER_SIDE, numberOfBlocksForMatrixOperations = numberOfMatrixFields/256+1;
 
 	// Start by zeroing out the obstacleMatrices
+	CUDA_CHECK_RETURN(cudaMemcpyToSymbol(currentNrOfObstaclesOnGPU,&lidarExportData.currentNrOfObstacles,sizeof(int),0,cudaMemcpyHostToDevice));
 	CUDA_CHECK_RETURN(cudaMemset(obstacleMatrixForMaxZOnGPU,0,sizeOfObstacleMatrix));
 	CUDA_CHECK_RETURN(cudaMemset(obstacleMatrixForMinZOnGPU,0,sizeOfObstacleMatrix));
 
 	// No write to the max and min matrix. One thread per lidarDataPoint 225*128 = 28800, then identify the obstacles in the matrices and write them to obstacleDataOnDevice
 	writeMaxAndMinZToMatrices<<<225,128>>>(obstacleMatrixForMaxZOnGPU,obstacleMatrixForMinZOnGPU,lidarDataPointsOnGPU);
-	identifyObstacles<<<numberOfBlocksForMatrixOperations,256>>>(obstacleMatrixForMaxZOnGPU,obstacleMatrixForMinZOnGPU,obstacleSquaresOnGPU,deviceObstacleArrayIndex);
+	identifyObstacles<<<numberOfBlocksForMatrixOperations,256>>>(obstacleMatrixForMaxZOnGPU,obstacleMatrixForMinZOnGPU,obstacleSquaresOnGPU);
 
 	// Copy the obstacle data back to the device
 	CUDA_CHECK_RETURN(cudaMemcpy(obstacleSquares, obstacleSquaresOnGPU, sizeOfObstacleSquares, cudaMemcpyDeviceToHost));
-
-	// Set the number of obstacles idenitified in lidarMemoryPointers.currentNrOfObstacles	__global__ void identifyObstacles(const int* obstacleMatrixForMaxZOnGPU,const int* obstacleMatrixForMinZOnGPU,ObstaclePoint* obstacleSquaresOnGPU,int* deviceObstacleArrayIndex,int numberOfMatrixFieldsPerSide)
-	CUDA_CHECK_RETURN(cudaMemcpy(&lidarExportData.currentNrOfObstacles, deviceObstacleArrayIndex, sizeof(int), cudaMemcpyDeviceToHost));
-	CUDA_CHECK_RETURN(cudaFree(deviceObstacleArrayIndex)); // TODO this shouldnt be done every iteration
+	CUDA_CHECK_RETURN(cudaMemcpyFromSymbol(&lidarExportData.currentNrOfObstacles,currentNrOfObstaclesOnGPU,sizeof(int),0,cudaMemcpyDeviceToHost));
 
 	cudaDeviceSynchronize();
 }
@@ -243,7 +240,7 @@ namespace { // Limit scope to translation unit
 		}
 	}
 
-	__global__ void identifyObstacles(const int* obstacleMatrixForMaxZOnGPU,const int* obstacleMatrixForMinZOnGPU,ObstaclePoint* obstacleSquaresOnGPU,int* deviceObstacleArrayIndex) {
+	__global__ void identifyObstacles(const int* obstacleMatrixForMaxZOnGPU,const int* obstacleMatrixForMinZOnGPU,ObstaclePoint* obstacleSquaresOnGPU) {
 		int myThreadID = blockIdx.x*blockDim.x+threadIdx.x,myMatrixXcoord,myMatrixYcoord,myObstacleIndex,numberOfMatrixFields = GROUND_GRID_FIELDS_PER_SIDE*GROUND_GRID_FIELDS_PER_SIDE;
 		float obstacleX,obstacleY;
 
@@ -261,7 +258,7 @@ namespace { // Limit scope to translation unit
 				(*(obstacleMatrixForMaxZOnGPU+myThreadID)-*(obstacleMatrixForMinZOnGPU+myThreadID) > zValAsInt(MIN_OBSTACLE_DELTA_Z))) {
 
 			// Obstacle identified
-			myObstacleIndex = atomicAdd(deviceObstacleArrayIndex,1);
+			myObstacleIndex = atomicAdd(&currentNrOfObstaclesOnGPU,1);
 			if (myObstacleIndex < MAX_NUMBER_OF_OBSTACLES) {
 				// Now write the coordinates to the obstacle square:
 				(obstacleSquaresOnGPU+4*myObstacleIndex)->x = obstacleX;

@@ -10,7 +10,7 @@ class Input {
 	PathPlanning& pathPlanning; // Pointer to the pathPlanning object, so the parser can call its public functions
 
 	//Internally located:
-	bool stopParserThread, exitProgram;
+	bool exitProgram;
 	pthread_t parserThreadID;
 
 	void startParserThread();

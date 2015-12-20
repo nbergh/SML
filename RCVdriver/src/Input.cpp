@@ -14,12 +14,10 @@ Input::Input(VehicleStatus& vehicleStatus, PathPlanning& pathPlanning):
 
 Input::~Input() {
 	// Stop the parser thread, and wait for it to exit
-	stopParserThread=true;
 	pthread_join(parserThreadID,NULL);
 }
 
 void Input::startParserThread() {
-	stopParserThread=false;
 	exitProgram=false;
 
 	//Start the receiver thread
@@ -57,10 +55,9 @@ void* Input::parserThreadFunction(void* arg) {
 
 	PathPlanning& pathPlanning = thisPointer->pathPlanning;
 	VehicleStatus& vehicleStatus = thisPointer->vehicleStatus;
-	bool& stopParserThread = thisPointer->stopParserThread;
 	char outputCommand[50], inputCommand[50];
 
-	while(!stopParserThread) {
+	while(true) {
 		printf("%s","RCV>");
 		if (fgets(inputCommand,50,stdin)==0) {
 			printf("%s%s\n","Read error: ",strerror(errno));
@@ -69,9 +66,10 @@ void* Input::parserThreadFunction(void* arg) {
 		if ((*inputCommand)==10) {continue;} // Empty command
 
 		if (thisPointer->compareStrings(inputCommand,"loadpath ",9)) {
-			// Call setMacroPath in pathPlanning
+			// Set the "load new macro path" flag in path planner
 			thisPointer->combineStrings("./Paths/",inputCommand+9,outputCommand,50);
-			pathPlanning.setMacroPath(outputCommand);
+			pathPlanning.setMacroPathFilePath(outputCommand);
+			pathPlanning.setLoadNewMacroPathFlag();
 			continue;
 		}
 		if (thisPointer->compareStrings(inputCommand,"start",5)) {

@@ -72,6 +72,9 @@ class PathPlanning {
 	HashTable hashTable;
 	MinHeap minHeap;
 
+	bool loadNewMacroPathFlag;
+	char* macroPathFilePath;
+
 	PathPointInGPScords* macroPathGPS; // The main GPS path (start to goal) as a linked list
 	PathPointInGPScords* microPathGPS; // The path to the next point in the mainGPSpath as a linked list
 	PathPointInLocalXY* microPathXY; // The same path as microPathGPS, but in x,y coordinates
@@ -84,6 +87,7 @@ class PathPlanning {
 	bool translateMicroPathToXYandCheckIfMicroPathIsTooCloseToObstacles() const;
 	bool generateMicroPath(float targetX, float targetY, double localTargetHeading);
 	void discoverNeighbor(aStarNode& baseNode, const float targetX, const float targetY, const double targetHeading, const int index);
+	void loadNewMacroPath();
 	bool checkIfaStarNodeIsTooCloseToObstacles(const aStarNode& node, const double vehicleHeadingAtNode) const;
 	double getTargetHeadingForMicroPath();
 	void clearAllPaths(bool includeMacroPath);
@@ -93,7 +97,8 @@ class PathPlanning {
 		~PathPlanning();
 
 		void updatePathAndControlSignals();
-		void setMacroPath(const char* filePath);
+		void setLoadNewMacroPathFlag() {loadNewMacroPathFlag=true;}
+		void setMacroPathFilePath(char* macroPathFilePath) {this->macroPathFilePath=macroPathFilePath;}
 		const PathExportData& getPathExportData() {return pathExportData;}
 
 };
