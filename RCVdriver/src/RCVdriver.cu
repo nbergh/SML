@@ -16,6 +16,8 @@
 #include "Headers/Parameters.h"
 
 #include <unistd.h>
+#include <stdio.h>
+#include <sys/time.h>
 
 int main(void)
 {
@@ -29,14 +31,24 @@ int main(void)
 //	Graphics graphics = Graphics(lidarProcessing.getLidarExportData(),pathPlanning.getPathExportData());
 	Input input = Input(vehicleStatus,pathPlanning);
 
+	timeval startTime,endTime;
+	int iterationTime=0;
+
 	// Start the main controller thread:
 	while (!input.getExitProgramBool()) {
 		// runMainControllerLoop controller loop
 		sleep(1); // TODO make dynamic
+
+		gettimeofday(&startTime,NULL);
+
 		lidarProcessing.processLidarData(); // Process the lidar data from the sensors
 		positionEstimation.updatePosition(); // Update the position (VehiclePosition)
 		pathPlanning.updatePathAndControlSignals(); // Update the path and send control signals
 
+		gettimeofday(&endTime,NULL);
+		iterationTime = (endTime.tv_sec*1000000 + endTime.tv_usec) - (startTime.tv_sec*1000000 + startTime.tv_usec);
+
+		printf("%s%d\n","itertime: ",iterationTime);
 	}
 }
 

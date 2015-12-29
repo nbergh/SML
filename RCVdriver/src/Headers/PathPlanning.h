@@ -19,13 +19,13 @@ class PathPlanning {
 		 * along its longitudinal centerline}. It is not a heading, since it has no relation
 		 * with north, and only has a meaning in the vehicle local coordinate system
 		 */
-		aStarNode(float x, float y, double vehicleHeadingAtNode) : x(x), y(y), vehicleHeadingAtNode(vehicleHeadingAtNode) {
+		aStarNode(float x, float y, double localVehicleHeadingAtNode) : x(x), y(y), localVehicleHeadingAtNode(localVehicleHeadingAtNode) {
 			distanceFromStartNode=0;heuristic=0;isOnOpenSet=false,isOnClosedSet=false,vehicleIsReversingFromPrevNode=0;
 			heapArrayIndex=0,previousNodeInPath=NULL;
 		}
 
 		const float x, y;
-		double vehicleHeadingAtNode;
+		double localVehicleHeadingAtNode;
 		float distanceFromStartNode,heuristic;
 		bool isOnOpenSet, isOnClosedSet, vehicleIsReversingFromPrevNode;
 		int heapArrayIndex;
@@ -88,7 +88,7 @@ class PathPlanning {
 	bool generateMicroPath(float targetX, float targetY, double localTargetHeading);
 	void discoverNeighbor(aStarNode& baseNode, const float targetX, const float targetY, const double targetHeading, const int index);
 	void loadNewMacroPath();
-	bool checkIfaStarNodeIsTooCloseToObstacles(const aStarNode& node, const double vehicleHeadingAtNode) const;
+	bool checkIfaStarNodeIsTooCloseToObstacles(const aStarNode& node, const double vehicleLocalHeadingAtNode) const;
 	double getTargetHeadingForMicroPath();
 	void clearAllPaths(bool includeMacroPath);
 

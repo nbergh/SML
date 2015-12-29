@@ -4,15 +4,15 @@
 
 # Add inputs and outputs from these tool invocations to the build variables 
 CPP_SRCS += \
-../src/PositionEstimation/GPSdataReceiver.cpp \
+../src/PositionEstimation/GPSUPDReceiver.cpp \
 ../src/PositionEstimation/PositionEstimation.cpp 
 
 OBJS += \
-./src/PositionEstimation/GPSdataReceiver.o \
+./src/PositionEstimation/GPSUPDReceiver.o \
 ./src/PositionEstimation/PositionEstimation.o 
 
 CPP_DEPS += \
-./src/PositionEstimation/GPSdataReceiver.d \
+./src/PositionEstimation/GPSUPDReceiver.d \
 ./src/PositionEstimation/PositionEstimation.d 
 
 

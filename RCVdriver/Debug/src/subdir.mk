@@ -5,7 +5,8 @@
 # Add inputs and outputs from these tool invocations to the build variables 
 CPP_SRCS += \
 ../src/Graphics.cpp \
-../src/Input.cpp 
+../src/Input.cpp \
+../src/UDPReceiver.cpp 
 
 CU_SRCS += \
 ../src/CudaErrorCheckFunctions.cu \
@@ -22,11 +23,13 @@ OBJS += \
 ./src/Graphics.o \
 ./src/Input.o \
 ./src/PathPlanning.o \
-./src/RCVdriver.o 
+./src/RCVdriver.o \
+./src/UDPReceiver.o 
 
 CPP_DEPS += \
 ./src/Graphics.d \
-./src/Input.d 
+./src/Input.d \
+./src/UDPReceiver.d 
 
 
 # Each subdirectory must supply rules for building sources it contributes

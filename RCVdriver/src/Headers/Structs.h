@@ -24,7 +24,7 @@ struct PathExportData {
 	PathExportData(int lengthOfMacroPath,int currentIndexInMacroPath,int lengthOfMicroPath,int currentIndexInMicroPath) :
 		lengthOfMacroPath(lengthOfMacroPath),currentIndexInMacroPath(currentIndexInMacroPath),
 		lengthOfMicroPath(lengthOfMicroPath),currentIndexInMicroPath(currentIndexInMicroPath),
-		macroPathXY(0),microPathXY(0) {}
+		macroPathXY(),microPathXY() {}
 
 	PathPointInLocalXY* macroPathXY,* microPathXY;
 	int& lengthOfMacroPath,& currentIndexInMacroPath,& lengthOfMicroPath,& currentIndexInMicroPath;

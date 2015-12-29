@@ -2,9 +2,11 @@
 #define POSITIONESTIMATION_H_
 
 #include "../../Headers/Structs.h"
+#include "GPSUPDReceiver.h"
 
 class PositionEstimation {
 	VehiclePosition vehiclePosition; // The state of the vehicle
+//	GPSUDPReceiver gpsUDPReceiver;
 
 public:
 	PositionEstimation();

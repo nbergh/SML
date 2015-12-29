@@ -80,12 +80,12 @@ void LidarProcessing::processLidarData() {
 
 
 	// Lidar debugging:
-	for (int i=0;i<lidarExportData.currentNrOfObstacles;i++) {
-		printf("%s%f%s%f%s%f%s%f%s\n","plot([",(obstacleSquares+4*i)->x,",",(obstacleSquares+4*i+1)->x,"],[",(obstacleSquares+4*i)->y,",",(obstacleSquares+4*i+1)->y,"],'r')");
-		printf("%s%f%s%f%s%f%s%f%s\n","plot([",(obstacleSquares+4*i)->x,",",(obstacleSquares+4*i+3)->x,"],[",(obstacleSquares+4*i)->y,",",(obstacleSquares+4*i+3)->y,"],'r')");
-		printf("%s%f%s%f%s%f%s%f%s\n","plot([",(obstacleSquares+4*i+1)->x,",",(obstacleSquares+4*i+2)->x,"],[",(obstacleSquares+4*i+1)->y,",",(obstacleSquares+4*i+2)->y,"],'r')");
-		printf("%s%f%s%f%s%f%s%f%s\n","plot([",(obstacleSquares+4*i+3)->x,",",(obstacleSquares+4*i+2)->x,"],[",(obstacleSquares+4*i+3)->y,",",(obstacleSquares+4*i+2)->y,"],'r')");
-	}
+//	for (int i=0;i<lidarExportData.currentNrOfObstacles;i++) {
+//		printf("%s%f%s%f%s%f%s%f%s\n","plot([",(obstacleSquares+4*i)->x,",",(obstacleSquares+4*i+1)->x,"],[",(obstacleSquares+4*i)->y,",",(obstacleSquares+4*i+1)->y,"],'r')");
+//		printf("%s%f%s%f%s%f%s%f%s\n","plot([",(obstacleSquares+4*i)->x,",",(obstacleSquares+4*i+3)->x,"],[",(obstacleSquares+4*i)->y,",",(obstacleSquares+4*i+3)->y,"],'r')");
+//		printf("%s%f%s%f%s%f%s%f%s\n","plot([",(obstacleSquares+4*i+1)->x,",",(obstacleSquares+4*i+2)->x,"],[",(obstacleSquares+4*i+1)->y,",",(obstacleSquares+4*i+2)->y,"],'r')");
+//		printf("%s%f%s%f%s%f%s%f%s\n","plot([",(obstacleSquares+4*i+3)->x,",",(obstacleSquares+4*i+2)->x,"],[",(obstacleSquares+4*i+3)->y,",",(obstacleSquares+4*i+2)->y,"],'r')");
+//	}
 }
 
 void LidarProcessing::translateLidarDataFromRawToXYZ() {
@@ -97,7 +97,6 @@ void LidarProcessing::translateLidarDataFromRawToXYZ() {
 
 	// Copy the xyz lidar data back to the device for openGL visualization
 	CUDA_CHECK_RETURN(cudaMemcpy(lidarDataPoints, lidarDataPointsOnGPU, sizeOfLidarDataPoints, cudaMemcpyDeviceToHost));
-	cudaDeviceSynchronize(); // Wait for the device to finish all its work
 }
 
 void LidarProcessing::identifyObstaclesInLidarData() {
@@ -129,8 +128,6 @@ void LidarProcessing::identifyObstaclesInLidarData() {
 	// Copy the obstacle data back to the device
 	CUDA_CHECK_RETURN(cudaMemcpy(obstacleSquares, obstacleSquaresOnGPU, sizeOfObstacleSquares, cudaMemcpyDeviceToHost));
 	CUDA_CHECK_RETURN(cudaMemcpyFromSymbol(&lidarExportData.currentNrOfObstacles,currentNrOfObstaclesOnGPU,sizeof(int),0,cudaMemcpyDeviceToHost));
-
-	cudaDeviceSynchronize();
 }
 
 namespace { // Limit scope to translation unit
