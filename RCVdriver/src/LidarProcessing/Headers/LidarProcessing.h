@@ -6,11 +6,11 @@
 
 class LidarProcessing {
 	//Pointers to device and host memory:
-	int sizeOfRawLidarData,sizeOfLidarDataPoints,sizeOfObstacleSquares,sizeOfObstacleMatrix;
 	char *rawLidarData, *rawLidarDataOnGPU;
 	LidarDataPoint *lidarDataPoints, *lidarDataPointsOnGPU;
 	ObstaclePoint *obstacleSquares, *obstacleSquaresOnGPU;
 	int *obstacleMatrixForMaxZOnGPU, *obstacleMatrixForMinZOnGPU;
+	int sizeOfRawLidarData,sizeOfLidarDataPoints,sizeOfObstacleSquares,sizeOfObstacleMatrix;
 
 	// Members:
 	LidarUDPReceiver* lidarUDPReceiver;

@@ -34,11 +34,10 @@ int main(void)
 	timeval startTime,endTime;
 	int iterationTime=0;
 
+	sleep(1);
+
 	// Start the main controller thread:
 	while (!input.getExitProgramBool()) {
-		// runMainControllerLoop controller loop
-		sleep(1); // TODO make dynamic
-
 		gettimeofday(&startTime,NULL);
 
 		lidarProcessing.processLidarData(); // Process the lidar data from the sensors
@@ -48,7 +47,9 @@ int main(void)
 		gettimeofday(&endTime,NULL);
 		iterationTime = (endTime.tv_sec*1000000 + endTime.tv_usec) - (startTime.tv_sec*1000000 + startTime.tv_usec);
 
-		printf("%s%d\n","itertime: ",iterationTime);
+//		printf("%s%d\n","itertime: ",iterationTime);
+//		sleep(0.1-(iterationTime/1000000.0)); // Run at 10 Hz
+		sleep(0.1);
 	}
 }
 

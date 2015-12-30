@@ -78,7 +78,6 @@ void LidarProcessing::processLidarData() {
 	translateLidarDataFromRawToXYZ();
 	identifyObstaclesInLidarData();
 
-
 	// Lidar debugging:
 //	for (int i=0;i<lidarExportData.currentNrOfObstacles;i++) {
 //		printf("%s%f%s%f%s%f%s%f%s\n","plot([",(obstacleSquares+4*i)->x,",",(obstacleSquares+4*i+1)->x,"],[",(obstacleSquares+4*i)->y,",",(obstacleSquares+4*i+1)->y,"],'r')");
@@ -112,12 +111,10 @@ void LidarProcessing::identifyObstaclesInLidarData() {
 	 * then an obstacle have been identified at that matrix field. The definition of an obstacle is then "Two or more LidarDataPoints that
 	 * share a similar x and y position but a different z position", e.g. some kind of vertical shape.
 	 */
-
-	lidarExportData.currentNrOfObstacles=0;
-	int numberOfMatrixFields = GROUND_GRID_FIELDS_PER_SIDE * GROUND_GRID_FIELDS_PER_SIDE, numberOfBlocksForMatrixOperations = numberOfMatrixFields/256+1;
+	int numberOfMatrixFields = GROUND_GRID_FIELDS_PER_SIDE * GROUND_GRID_FIELDS_PER_SIDE, numberOfBlocksForMatrixOperations = numberOfMatrixFields/256+1,currentNrOfObstacles=0;
 
 	// Start by zeroing out the obstacleMatrices
-	CUDA_CHECK_RETURN(cudaMemcpyToSymbol(currentNrOfObstaclesOnGPU,&lidarExportData.currentNrOfObstacles,sizeof(int),0,cudaMemcpyHostToDevice));
+	CUDA_CHECK_RETURN(cudaMemcpyToSymbol(currentNrOfObstaclesOnGPU,&currentNrOfObstacles,sizeof(int),0,cudaMemcpyHostToDevice));
 	CUDA_CHECK_RETURN(cudaMemset(obstacleMatrixForMaxZOnGPU,0,sizeOfObstacleMatrix));
 	CUDA_CHECK_RETURN(cudaMemset(obstacleMatrixForMinZOnGPU,0,sizeOfObstacleMatrix));
 
@@ -127,7 +124,8 @@ void LidarProcessing::identifyObstaclesInLidarData() {
 
 	// Copy the obstacle data back to the device
 	CUDA_CHECK_RETURN(cudaMemcpy(obstacleSquares, obstacleSquaresOnGPU, sizeOfObstacleSquares, cudaMemcpyDeviceToHost));
-	CUDA_CHECK_RETURN(cudaMemcpyFromSymbol(&lidarExportData.currentNrOfObstacles,currentNrOfObstaclesOnGPU,sizeof(int),0,cudaMemcpyDeviceToHost));
+	CUDA_CHECK_RETURN(cudaMemcpyFromSymbol(&currentNrOfObstacles,currentNrOfObstaclesOnGPU,sizeof(int),0,cudaMemcpyDeviceToHost));
+	lidarExportData.currentNrOfObstacles=currentNrOfObstacles;
 }
 
 namespace { // Limit scope to translation unit
@@ -248,10 +246,10 @@ namespace { // Limit scope to translation unit
 
 		/* To go back from matrix coordinates to LidarDataPoint x and y coordinates, we do the same steps as described
 		 * above, but in reverse. An obstacle is registered if myThreadID is within the matrix, the obstacle coords are outside
-		 * of the RCV vehicle, and the max Z in obstacleMatrixForMaxZOnGPU minus the min Z in obstacleMatrixForMinZOnGPU is larger
+		 * of the RCV vehicle , and the max Z in obstacleMatrixForMaxZOnGPU minus the min Z in obstacleMatrixForMinZOnGPU is larger
 		 * than MIN_OBSTACLE_DELTA_Z
 		 */
-		if (	myThreadID<numberOfMatrixFields && abs(obstacleX) > RCV_WIDTH/2.0 && abs(obstacleY) > RCV_LENGTH/2.0 &&
+		if (	myThreadID<numberOfMatrixFields && (abs(obstacleX+GROUND_GRID_RESOLUTION/2.0) > (RCV_WIDTH/2.0 + OBSTACLE_SAFETY_DISTANCE) || abs(obstacleY+GROUND_GRID_RESOLUTION/2.0) > (RCV_LENGTH/2.0 + OBSTACLE_SAFETY_DISTANCE)) &&
 				(*(obstacleMatrixForMaxZOnGPU+myThreadID)-*(obstacleMatrixForMinZOnGPU+myThreadID) > zValAsInt(MIN_OBSTACLE_DELTA_Z))) {
 
 			// Obstacle identified

@@ -73,7 +73,7 @@ class PathPlanning {
 	MinHeap minHeap;
 
 	bool loadNewMacroPathFlag;
-	char* macroPathFilePath;
+	const char* macroPathFilePath;
 
 	PathPointInGPScords* macroPathGPS; // The main GPS path (start to goal) as a linked list
 	PathPointInGPScords* microPathGPS; // The path to the next point in the mainGPSpath as a linked list

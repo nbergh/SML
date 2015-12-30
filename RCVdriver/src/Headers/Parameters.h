@@ -16,9 +16,11 @@
 #define RCV_WIDTH 0.8 // In meters
 #define RCV_LENGTH 2.4 // In meters
 #define RCV_HEIGHT 0.7 // In meters
-#define OBSTACLE_SAFETY_DISTANCE 0.1
-/* The minimum distance in meters from any obstacle that the pathplanner will keep. Don't set to less than GROUND_GRID_RESOLUTION,
- * since the distance to an obstacle from a pathNode has an an error margin of +/- sqrt(2)/2 * GROUND_GRID_RESOLUTION
+#define OBSTACLE_SAFETY_DISTANCE 0.05
+/* The minimum distance in meters from {the midpoint of} any obstacle that the pathplanner will keep. An obstacle is represented as a
+ * square (with size GROUND_GRID_RESOLUTION*GROUND_GRID_RESOLUTION) in the ground grid. Hence any point closer to sqrt(2)/2 * GROUND_GRID_RESOLUTION
+ * to the midpoint of an obstacle will be in danger of touching that obstacle. Therefore the safety distance must be greater than
+ * sqrt(2)/2 * GROUND_GRID_RESOLUTION
  */
 
 
