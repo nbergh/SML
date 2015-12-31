@@ -43,7 +43,7 @@ void* Graphics::graphicsThreadFunction(void* arg) {
 	glutInit(&argc, &argv);
 	glutInitDisplayMode(GLUT_DEPTH | GLUT_DOUBLE | GLUT_RGBA);
 	glutInitWindowPosition(0,0);
-	glutInitWindowSize(1000,1000);
+	glutInitWindowSize(960,600);
 	glutCreateWindow("Lidar 3D visualization");
 //	glutFullScreen();
 
@@ -159,12 +159,12 @@ void Graphics::drawDisplay() {
 	glDrawArrays(GL_QUADS,0,4*thisPointer->lidarExportData.currentNrOfObstacles);
 
 	//Draw the paths:
-	glEnableClientState(GL_COLOR_ARRAY);
-	glColorPointer(3,GL_UNSIGNED_BYTE,sizeof(PathPointInLocalXY),&thisPointer->pathExportData.macroPathXY->b);
+	glColor3f(0,0,1); // Set the color of the macroPath to blue
 	glVertexPointer(2,GL_FLOAT,sizeof(PathPointInLocalXY),&thisPointer->pathExportData.macroPathXY->x);
 	glDrawArrays(GL_LINE_STRIP,thisPointer->pathExportData.currentIndexInMacroPath-1,thisPointer->pathExportData.lengthOfMacroPath-(thisPointer->pathExportData.currentIndexInMacroPath-1));
 
-	glColorPointer(3,GL_UNSIGNED_BYTE,sizeof(PathPointInLocalXY),&thisPointer->pathExportData.microPathXY->b);
+	glEnableClientState(GL_COLOR_ARRAY);
+	glColorPointer(3,GL_UNSIGNED_BYTE,sizeof(PathPointInLocalXY),&thisPointer->pathExportData.microPathXY->r);
 	glVertexPointer(2,GL_FLOAT,sizeof(PathPointInLocalXY),&thisPointer->pathExportData.microPathXY->x);
 	glDrawArrays(GL_LINE_STRIP,thisPointer->pathExportData.currentIndexInMicroPath-1,thisPointer->pathExportData.lengthOfMicroPath-(thisPointer->pathExportData.currentIndexInMicroPath-1));
 

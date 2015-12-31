@@ -49,7 +49,8 @@ int main(void)
 
 //		printf("%s%d\n","itertime: ",iterationTime);
 //		sleep(0.1-(iterationTime/1000000.0)); // Run at 10 Hz
-		sleep(0.1);
 	}
+
+	//TODO debug deletion of objects
 }
 

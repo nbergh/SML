@@ -13,7 +13,7 @@ struct ObstaclePoint {
 };
 struct PathPointInLocalXY {
 	float x,y;
-	unsigned char r,b,g; // Colors of the point
+	unsigned char r,g,b; // Colors of the point
 };
 struct LidarExportData {
 	LidarDataPoint* lidarDataPoints;
@@ -21,12 +21,12 @@ struct LidarExportData {
 	int currentNrOfObstacles;
 };
 struct PathExportData {
-	PathExportData(int lengthOfMacroPath,int currentIndexInMacroPath,int lengthOfMicroPath,int currentIndexInMicroPath) :
+	PathExportData(int& lengthOfMacroPath,int& currentIndexInMacroPath,int& lengthOfMicroPath,int& currentIndexInMicroPath, PathPointInLocalXY*& macroPathXY, PathPointInLocalXY*& microPathXY) :
 		lengthOfMacroPath(lengthOfMacroPath),currentIndexInMacroPath(currentIndexInMacroPath),
 		lengthOfMicroPath(lengthOfMicroPath),currentIndexInMicroPath(currentIndexInMicroPath),
-		macroPathXY(),microPathXY() {}
+		macroPathXY(macroPathXY),microPathXY(microPathXY) {}
 
-	PathPointInLocalXY* macroPathXY,* microPathXY;
+	PathPointInLocalXY*& macroPathXY,*& microPathXY;
 	int& lengthOfMacroPath,& currentIndexInMacroPath,& lengthOfMicroPath,& currentIndexInMicroPath;
 };
 

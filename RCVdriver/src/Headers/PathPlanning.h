@@ -19,8 +19,8 @@ class PathPlanning {
 		 * along its longitudinal centerline}. It is not a heading, since it has no relation
 		 * with north, and only has a meaning in the vehicle local coordinate system
 		 */
-		aStarNode(float x, float y, double localVehicleHeadingAtNode) : x(x), y(y), localVehicleHeadingAtNode(localVehicleHeadingAtNode) {
-			distanceFromStartNode=0;heuristic=0;isOnOpenSet=false,isOnClosedSet=false,vehicleIsReversingFromPrevNode=0;
+		aStarNode(float x, float y) : x(x), y(y) {
+			localVehicleHeadingAtNode=0;distanceFromStartNode=0;heuristic=0;isOnOpenSet=false,isOnClosedSet=false,vehicleIsReversingFromPrevNode=0;
 			heapArrayIndex=0,previousNodeInPath=NULL;
 		}
 
@@ -33,7 +33,7 @@ class PathPlanning {
 	};
 	class HashTable {
 		struct HashBucket {
-			HashBucket(float x, float y, double vehicleHeadingAtNode) : node(x,y,vehicleHeadingAtNode) {nextBucket=NULL;}
+			HashBucket(float x, float y) : node(x,y) {nextBucket=NULL;}
 			aStarNode node; // aStarNodes are stored here
 			HashBucket* nextBucket; // A linked list of buckets that share the same index
 		};

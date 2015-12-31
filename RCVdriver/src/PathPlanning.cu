@@ -26,8 +26,8 @@ namespace {
 }
 // PathPlanning:
 PathPlanning::PathPlanning(const LidarExportData& lidarExportData,const VehiclePosition &vehiclePosition, VehicleStatus& vehicleStatus):
-		lidarExportData(lidarExportData),vehiclePosition(vehiclePosition),
-		vehicleStatus(vehicleStatus),pathExportData(lengthOfMacroPath,currentIndexInMacroPath,lengthOfMicroPath,currentIndexInMicroPath),
+		lidarExportData(lidarExportData),vehiclePosition(vehiclePosition),vehicleStatus(vehicleStatus),
+		pathExportData(lengthOfMacroPath,currentIndexInMacroPath,lengthOfMicroPath,currentIndexInMicroPath,macroPathXY,microPathXY),
 		minHeap(),hashTable() {
 
 	macroPathGPS=NULL;
@@ -286,8 +286,6 @@ bool PathPlanning::generateMicroPath(const float targetX, const float targetY, c
 	/* This function generates a path from {0,0} to targetX,targetY using a variant of A* tailored for producing vehicle paths
 	 * returns true if a path was found, and false otherwise
 	 */
-	//temp:
-	printf("%s\n","planning new path");
 
 	// First delete the current microGPSpath:
 	clearAllPaths(false);
@@ -299,7 +297,7 @@ bool PathPlanning::generateMicroPath(const float targetX, const float targetY, c
 	timeval startTime,currentTime;
 	gettimeofday(&startTime,NULL);
 
-	aStarNode* baseNode = &hashTable.addAstarNode(0,-1,0,0,false);
+	aStarNode* baseNode = &hashTable.addAstarNode(0,-1,0,0,false),* goalNode;
 	iter=0;
 
 	while (true) {
@@ -313,17 +311,19 @@ bool PathPlanning::generateMicroPath(const float targetX, const float targetY, c
 		baseNodeDeltaCourseToTarget = atan2(targetX-baseNode->x,targetY-baseNode->y) - baseNode->localVehicleHeadingAtNode;
 		if (baseNodeDistanceToTarget < 10*GROUND_GRID_RESOLUTION && (abs(baseNodeDeltaCourseToTarget) < 0.1 || abs(abs(baseNodeDeltaCourseToTarget)-M_PI) < 0.1)) {
 			bool isReversing = !(abs(baseNodeDeltaCourseToTarget) < 0.1);
-			aStarNode* goalNode = &hashTable.addAstarNode(baseNode->x,baseNode->y,targetX,targetY,isReversing);
-			if (baseNode!=goalNode) {
-				goalNode->vehicleIsReversingFromPrevNode = isReversing;
-				goalNode->previousNodeInPath = baseNode;
-				baseNode = goalNode;
+			goalNode = &hashTable.addAstarNode(baseNode->x,baseNode->y,targetX,targetY,isReversing);
+			if (!checkIfaStarNodeIsTooCloseToObstacles(*goalNode,baseNode->localVehicleHeadingAtNode+baseNodeDeltaCourseToTarget)) {
+				if (baseNode!=goalNode) {
+					goalNode->vehicleIsReversingFromPrevNode = isReversing;
+					goalNode->previousNodeInPath = baseNode;
+					baseNode = goalNode;
+				}
+				//temp:
+				printf("%s%d\n","path found, path planning time:",timePassedSinceStartOfLoop);
+				printf("%s%d\n","iters:",iter);
+				printf("%s%d\n","minheap av space:",minHeap.getAvailableSpace());
+				break;
 			}
-			//temp:
-			printf("%s%d\n","path found, path planning time:",timePassedSinceStartOfLoop);
-			printf("%s%d\n","iters:",iter);
-			printf("%s%d\n","minheap av space:",minHeap.getAvailableSpace());
-			break;
 		}
 
 		for (int i=0;i<10;i++) {discoverNeighbor(*baseNode,targetX,targetY,targetHeading,i);}
@@ -334,8 +334,8 @@ bool PathPlanning::generateMicroPath(const float targetX, const float targetY, c
 		timePassedSinceStartOfLoop = (currentTime.tv_sec*1000000 + currentTime.tv_usec) - (startTime.tv_sec*1000000 + startTime.tv_usec);
 
 		// If minheap is full or empty, or if the pathplanner has taken more than 100 msec to find a path, then a path could not be found, so return:
-		if (timePassedSinceStartOfLoop > 80000 || baseNode==NULL || minHeap.getAvailableSpace() < 10) {
-			printf("%s%d\n","no path found, path planning time:",timePassedSinceStartOfLoop);
+		if (/*timePassedSinceStartOfLoop > 80000*/ iter==220 || baseNode==NULL || minHeap.getAvailableSpace() < 10) {
+			printf("%s%d\n","path not found, path planning time:",timePassedSinceStartOfLoop);
 			printf("%s%d\n","iters:",iter);
 			printf("%s%d\n","minheap av space:",minHeap.getAvailableSpace());
 			return false;
@@ -435,7 +435,7 @@ void PathPlanning::discoverNeighbor(aStarNode& baseNode, const float targetX, co
 
 	neighborHeuristic = distanceFromStartNode;
 	neighborHeuristic += distanceToTarget;
-	neighborHeuristic += 4*abs(localCourseToTarget - localVehicleHeadingAtNode);
+	neighborHeuristic += 6*abs(localCourseToTarget - localVehicleHeadingAtNode);
 //	neighborHeuristic += 6*abs(targetHeading - vehicleHeadingAtNode); // Make the path align with targetheading
 	neighborHeuristic += (index>4) ? 1 : 0; // Punish switching direction
 
@@ -443,6 +443,7 @@ void PathPlanning::discoverNeighbor(aStarNode& baseNode, const float targetX, co
 		// Node has not been discovered yet
 		neighborNode.isOnOpenSet=true;
 
+		neighborNode.localVehicleHeadingAtNode=localVehicleHeadingAtNode;
 		neighborNode.distanceFromStartNode = distanceFromStartNode;
 		neighborNode.heuristic = neighborHeuristic;
 		neighborNode.previousNodeInPath = &baseNode;
@@ -566,12 +567,12 @@ PathPlanning::aStarNode& PathPlanning::HashTable::addAstarNode(float baseNodeX, 
 
 	bucketPointer=hashArray[arrayIndex];
 	if (bucketPointer==NULL) {
-		hashArray[arrayIndex]=new HashBucket(gridX*GROUND_GRID_RESOLUTION,gridY*GROUND_GRID_RESOLUTION,localVehicleHeadingAtNode); //Everything (including all the fields of the aStarNode) set to zero
+		hashArray[arrayIndex]=new HashBucket(gridX*GROUND_GRID_RESOLUTION,gridY*GROUND_GRID_RESOLUTION); //Everything (including all the fields of the aStarNode) set to zero
 		bucketPointer=hashArray[arrayIndex];
 	}
 	else {
 		while (bucketPointer->nextBucket!=NULL) {bucketPointer = bucketPointer->nextBucket;} // Get the latest bucket in the linked list for the specified index:
-		bucketPointer->nextBucket = new HashBucket(gridX*GROUND_GRID_RESOLUTION,gridY*GROUND_GRID_RESOLUTION,localVehicleHeadingAtNode);
+		bucketPointer->nextBucket = new HashBucket(gridX*GROUND_GRID_RESOLUTION,gridY*GROUND_GRID_RESOLUTION);
 		bucketPointer = bucketPointer->nextBucket;
 	}
 
@@ -676,7 +677,11 @@ namespace {
 		else if (rotatedObstacleY > RCV_LENGTH/2.0) {minDistanceToObstacle = rotatedObstacleY - RCV_LENGTH/2.0;}
 		else {minDistanceToObstacle = -1;} // Obstacle is inside the vehicle
 
-		if (minDistanceToObstacle < OBSTACLE_SAFETY_DISTANCE) {return true;}
+		if (minDistanceToObstacle < OBSTACLE_SAFETY_DISTANCE) {
+//			double lvhan=localVehicleHeadingAtNode;
+//			float ppx = pathPointX,ppy=pathPointY,ox=obstacleX,oy=obstacleY;
+			return true;
+		}
 		return false;
 	}
 
