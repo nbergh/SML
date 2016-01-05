@@ -45,7 +45,7 @@ void* Graphics::graphicsThreadFunction(void* arg) {
 	glutInitWindowPosition(0,0);
 	glutInitWindowSize(960,600);
 	glutCreateWindow("Lidar 3D visualization");
-//	glutFullScreen();
+	glutFullScreen();
 
 	// Register callbacks
 	glutDisplayFunc(drawDisplay);

@@ -182,10 +182,11 @@ namespace { // Limit scope to translation unit
 		 * rawLidarData + 89902, which is the same as pointerToStartOfPacket + 89902. Since the entire buffer represents one revolution, that will be ok
 		 */
 		__shared__ char* pointerToStartOfPacket;
-		__shared__ double blockAzimuthAngle, deltaAzimuth;
+		__shared__ double blockAzimuthAngle, previousBlockAzimuthAngle, deltaAzimuth;
 		pointerToStartOfPacket= rawLidarDataOnGPU + 100*blockIdx.x;
 		blockAzimuthAngle = getAzimuth(pointerToStartOfPacket+2);
-		deltaAzimuth = (blockAzimuthAngle - getAzimuth(pointerToStartOfPacket + ((blockIdx.x==0) ? 89902 : -98)))/2.0;
+		previousBlockAzimuthAngle = getAzimuth(pointerToStartOfPacket + ((blockIdx.x==0) ? 89902 : -98));
+		deltaAzimuth = ((blockAzimuthAngle - previousBlockAzimuthAngle) < -6) ? ((blockAzimuthAngle - (previousBlockAzimuthAngle-2*M_PI))/2.0) : ((blockAzimuthAngle - previousBlockAzimuthAngle)/2.0);
 
 		double myHorizontalAngle = (threadIdx.x > 15) ? blockAzimuthAngle : blockAzimuthAngle + deltaAzimuth;
 		double myVerticalAngle = getVerticalAngle(threadIdx.x%16);

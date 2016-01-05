@@ -21,21 +21,20 @@
 
 int main(void)
 {
-	//Temp:
+	//Temp:ex
 	VehicleStatus vehicleStatus = {0};
 
 	// Initialize the main objects:
 	LidarProcessing lidarProcessing = LidarProcessing();
 	PositionEstimation positionEstimation = PositionEstimation();
 	PathPlanning pathPlanning = PathPlanning(lidarProcessing.getLidarExportData(),positionEstimation.getCurrentVehiclePosition(),vehicleStatus);
-//	Graphics graphics = Graphics(lidarProcessing.getLidarExportData(),pathPlanning.getPathExportData());
+	Graphics graphics = Graphics(lidarProcessing.getLidarExportData(),pathPlanning.getPathExportData());
 	Input input = Input(vehicleStatus,pathPlanning);
+
+//	sleep(1);
 
 	timeval startTime,endTime;
 	int iterationTime=0;
-
-	sleep(1);
-
 	// Start the main controller thread:
 	while (!input.getExitProgramBool()) {
 		gettimeofday(&startTime,NULL);
@@ -46,9 +45,11 @@ int main(void)
 
 		gettimeofday(&endTime,NULL);
 		iterationTime = (endTime.tv_sec*1000000 + endTime.tv_usec) - (startTime.tv_sec*1000000 + startTime.tv_usec);
+		iterationTime = (iterationTime>(1000000.0/CONTROLLER_UPDATE_RATE) ? (1000000.0/CONTROLLER_UPDATE_RATE) : iterationTime);
 
 //		printf("%s%d\n","itertime: ",iterationTime);
-//		sleep(0.1-(iterationTime/1000000.0)); // Run at 10 Hz
+		sleep((1.0/CONTROLLER_UPDATE_RATE)-(iterationTime/1000000.0)); // Run at specified frequency
+//		sleep(100);
 	}
 
 	//TODO debug deletion of objects
