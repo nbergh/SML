@@ -186,7 +186,7 @@ namespace { // Limit scope to translation unit
 		pointerToStartOfPacket= rawLidarDataOnGPU + 100*blockIdx.x;
 		blockAzimuthAngle = getAzimuth(pointerToStartOfPacket+2);
 		previousBlockAzimuthAngle = getAzimuth(pointerToStartOfPacket + ((blockIdx.x==0) ? 89902 : -98));
-		deltaAzimuth = ((blockAzimuthAngle - previousBlockAzimuthAngle) < -6) ? ((blockAzimuthAngle - (previousBlockAzimuthAngle-2*M_PI))/2.0) : ((blockAzimuthAngle - previousBlockAzimuthAngle)/2.0);
+		deltaAzimuth = (blockAzimuthAngle<0.1 && previousBlockAzimuthAngle>6.2) ? ((blockAzimuthAngle - (previousBlockAzimuthAngle-2*M_PI))/2.0) : ((blockAzimuthAngle - previousBlockAzimuthAngle)/2.0);
 
 		double myHorizontalAngle = (threadIdx.x > 15) ? blockAzimuthAngle : blockAzimuthAngle + deltaAzimuth;
 		double myVerticalAngle = getVerticalAngle(threadIdx.x%16);

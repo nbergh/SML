@@ -4,10 +4,12 @@
 #include "../../Headers/UDPReceiver.h"
 
 class GPSUDPReceiver : public UDPReceiver {
-	void startReceiverThread();
+
+	virtual bool isValidPacket(const char* packetBuffer);
+	virtual void actionWhenReceived(const char* packetBuffer);
 
 public:
-	GPSUDPReceiver(const int port);
+	GPSUDPReceiver();
 	~GPSUDPReceiver();
 };
 

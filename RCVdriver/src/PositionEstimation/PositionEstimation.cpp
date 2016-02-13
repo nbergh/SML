@@ -5,15 +5,19 @@
  */
 
 PositionEstimation::PositionEstimation() :
-	vehiclePosition() {
+	vehiclePosition(), gpsUDPReceiver() {
 
 	// Very temp:
 	vehiclePosition.currentPosition.latc=59.35096;
 	vehiclePosition.currentPosition.longc=18.06808;
+
+
+
 }
 
 PositionEstimation::~PositionEstimation() {
 }
 
 void PositionEstimation::updatePosition() {
+
 }

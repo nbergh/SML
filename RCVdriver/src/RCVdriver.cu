@@ -31,7 +31,7 @@ int main(void)
 	Graphics graphics = Graphics(lidarProcessing.getLidarExportData(),pathPlanning.getPathExportData());
 	Input input = Input(vehicleStatus,pathPlanning);
 
-//	sleep(1);
+//	sleep(5);
 
 	timeval startTime,endTime;
 	int iterationTime=0;
@@ -48,7 +48,7 @@ int main(void)
 		iterationTime = (iterationTime>(1000000.0/CONTROLLER_UPDATE_RATE) ? (1000000.0/CONTROLLER_UPDATE_RATE) : iterationTime);
 
 //		printf("%s%d\n","itertime: ",iterationTime);
-//		sleep((1.0/CONTROLLER_UPDATE_RATE)-(iterationTime/1000000.0)); // Run at specified frequency
+		sleep((1.0/CONTROLLER_UPDATE_RATE)-(iterationTime/1000000.0)); // Run at specified frequency
 //		sleep(100);
 	}
 

@@ -282,10 +282,11 @@ double PathPlanning::getTargetHeadingForMicroPath() {
 
 //temp:
 int iter;
-bool PathPlanning::generateMicroPath(const float targetX, const float targetY, const double targetHeading) {
+bool PathPlanning::generateMicroPath(const float ctargetX, const float ctargetY, const double targetHeading) {
 	/* This function generates a path from {0,0} to targetX,targetY using a variant of A* tailored for producing vehicle paths
 	 * returns true if a path was found, and false otherwise
 	 */
+	float targetX=-6,targetY=0;
 
 	// First delete the current microGPSpath:
 	clearAllPaths(false);
@@ -334,7 +335,7 @@ bool PathPlanning::generateMicroPath(const float targetX, const float targetY, c
 		timePassedSinceStartOfLoop = (currentTime.tv_sec*1000000 + currentTime.tv_usec) - (startTime.tv_sec*1000000 + startTime.tv_usec);
 
 		// If minheap is full or empty, or if the pathplanner has taken more than 100 msec to find a path, then a path could not be found, so return:
-		if (timePassedSinceStartOfLoop > 80000 ||  /*iter==220 ||*/ baseNode==NULL || minHeap.getAvailableSpace() < 10) {
+		if (timePassedSinceStartOfLoop > 80000 ||  /*iter==350 ||*/ baseNode==NULL || minHeap.getAvailableSpace() < 10) {
 			printf("%s%d\n","path not found, path planning time:",timePassedSinceStartOfLoop);
 			printf("%s%d\n","iters:",iter);
 			printf("%s%d\n","minheap av space:",minHeap.getAvailableSpace());

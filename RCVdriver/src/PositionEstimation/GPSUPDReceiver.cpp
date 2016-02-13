@@ -1,8 +1,10 @@
 #include "Headers/GPSUPDReceiver.h"
 
-GPSUDPReceiver::GPSUDPReceiver(const int port) : UDPReceiver(port) {
+#define GPS_UDP_PORT 50000
+
+GPSUDPReceiver::GPSUDPReceiver() : UDPReceiver(GPS_UDP_PORT,143) {
+
 }
 
-
-void GPSUDPReceiver::startReceiverThread() {
+GPSUDPReceiver::~GPSUDPReceiver() {
 }

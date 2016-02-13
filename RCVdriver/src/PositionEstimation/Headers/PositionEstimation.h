@@ -6,7 +6,7 @@
 
 class PositionEstimation {
 	VehiclePosition vehiclePosition; // The state of the vehicle
-//	GPSUDPReceiver gpsUDPReceiver;
+	GPSUDPReceiver gpsUDPReceiver;
 
 public:
 	PositionEstimation();

@@ -8,8 +8,8 @@
 #include <arpa/inet.h>
 
 class UDPReceiver {
-
-protected:
+	const int packetSize;
+	char* packetBuffer;
 	bool stopReceiverThread; // Flag for exiting the thread
 	pthread_t receiverThreadID;
 
@@ -18,10 +18,16 @@ protected:
 	struct sockaddr_in socketAddressMe, socketAddressOther; // Socket addresses
 	socklen_t socketLength;
 
-	// Const and dest protected so base class cannot be instantiated or deleted
-	UDPReceiver(const int port);
-	~UDPReceiver();
+	// Functions:
+	void tryToReceivePacket();
+	static void* receiverThreadFunction(void *arg); // Thread function
+	virtual bool isValidPacket(const char* packetBuffer) {}; // This functions is implemented in a derived class, and must return true if the packet received is valid, and false otherwise
+	virtual void actionWhenReceived(const char* packetBuffer) {}; // This function is implemented in a derived class, and decides what to do when a packet has been received.
 
+protected:
+	// Const and dest protected so base class cannot be instantiated or deleted
+	UDPReceiver(const int UDPport, const int packetSize); // Port that packets should be received on, and the size (constant) of the packets that should be received
+	~UDPReceiver();
 };
 
 #endif /* UDPRECEIVER_H_ */
