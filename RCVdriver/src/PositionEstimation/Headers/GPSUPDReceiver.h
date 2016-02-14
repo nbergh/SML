@@ -5,8 +5,8 @@
 
 class GPSUDPReceiver : public UDPReceiver {
 
-	virtual bool isValidPacket(const char* packetBuffer);
-	virtual void actionWhenReceived(const char* packetBuffer);
+	virtual bool isValidPacket(const char* packetBuffer); // final
+	virtual void actionWhenReceived(const char* packetBuffer); // final
 
 public:
 	GPSUDPReceiver();

@@ -30,13 +30,6 @@ UDPReceiver::UDPReceiver(const int UDPport, int packetSize) : packetSize(packetS
 	// Test to see if UDP data can be received:
 	printf("%s%d%s\n","Trying to receive UDP data on port ", UDPport, "...");
 	tryToReceivePacket();
-	printf("%s\n","...success!");
-
-	//Start the receiver thread
-	if(pthread_create(&receiverThreadID,NULL,receiverThreadFunction,this)) {
-		printf("%s%s\n","Unable to create thread: ", strerror(errno));
-		exit(-1);
-	}
 }
 
 UDPReceiver::~UDPReceiver() {
@@ -46,19 +39,6 @@ UDPReceiver::~UDPReceiver() {
 	close(udpSocketID);
 
 	delete[] packetBuffer;
-}
-
-void* UDPReceiver::receiverThreadFunction(void* arg) {
-	UDPReceiver* thisPointer = (UDPReceiver*)arg;
-
-	bool& stopReceiverThread = thisPointer->stopReceiverThread;
-
-	while(!stopReceiverThread) {
-		thisPointer->tryToReceivePacket();
-		actionWhenReceived(thisPointer->packetBuffer);
-	}
-	printf("%s\n","UDP receiver thread exited");
-	pthread_exit(NULL);
 }
 
 void UDPReceiver::tryToReceivePacket() {
@@ -73,3 +53,25 @@ void UDPReceiver::tryToReceivePacket() {
 		if (isValidPacket(packetBuffer)) {return;}
 	}
 }
+
+void UDPReceiver::startReceiverThread() {
+	//Start the receiver thread
+	if(pthread_create(&receiverThreadID,NULL,receiverThreadFunction,this)) {
+		printf("%s%s\n","Unable to create thread: ", strerror(errno));
+		exit(-1);
+	}
+}
+
+void* UDPReceiver::receiverThreadFunction(void* arg) {
+	UDPReceiver* thisPointer = (UDPReceiver*)arg;
+
+	bool& stopReceiverThread = thisPointer->stopReceiverThread;
+
+	while(!stopReceiverThread) {
+		thisPointer->tryToReceivePacket();
+		thisPointer->actionWhenReceived(thisPointer->packetBuffer);
+	}
+	printf("%s\n","UDP receiver thread exited");
+	pthread_exit(NULL);
+}
+

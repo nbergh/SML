@@ -25,13 +25,11 @@ int main(void)
 	VehicleStatus vehicleStatus = {0};
 
 	// Initialize the main objects:
-	LidarProcessing lidarProcessing = LidarProcessing();
-	PositionEstimation positionEstimation = PositionEstimation();
-	PathPlanning pathPlanning = PathPlanning(lidarProcessing.getLidarExportData(),positionEstimation.getCurrentVehiclePosition(),vehicleStatus);
-	Graphics graphics = Graphics(lidarProcessing.getLidarExportData(),pathPlanning.getPathExportData());
-	Input input = Input(vehicleStatus,pathPlanning);
-
-//	sleep(5);
+	LidarProcessing lidarProcessing;
+	PositionEstimation positionEstimation;
+	PathPlanning pathPlanning(lidarProcessing.getLidarExportData(),positionEstimation.getCurrentVehiclePosition(),vehicleStatus);
+//	Graphics graphics(lidarProcessing.getLidarExportData(),pathPlanning.getPathExportData());
+	Input input(vehicleStatus,pathPlanning);
 
 	timeval startTime,endTime;
 	int iterationTime=0;

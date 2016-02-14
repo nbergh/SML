@@ -4,8 +4,7 @@
  * longitudinal centerline. CurrentHeading must always be between -Pi and Pi
  */
 
-PositionEstimation::PositionEstimation() :
-	vehiclePosition(), gpsUDPReceiver() {
+PositionEstimation::PositionEstimation() {
 
 	// Very temp:
 	vehiclePosition.currentPosition.latc=59.35096;

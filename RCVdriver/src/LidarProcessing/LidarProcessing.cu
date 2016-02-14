@@ -23,7 +23,7 @@ LidarProcessing::LidarProcessing() {
 	lidarExportData.obstacleSquaresOnGPU = obstacleSquaresOnGPU;
 
 	// Then initialize the UDP socket, test the connection, and start the UDP receiver thread:
-	lidarUDPReceiver = new LidarUDPReceiver(rawLidarData);
+//	lidarUDPReceiver = new LidarUDPReceiver(rawLidarData);
 }
 
 LidarProcessing::~LidarProcessing() {

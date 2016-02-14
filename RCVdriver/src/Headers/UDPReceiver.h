@@ -21,13 +21,14 @@ class UDPReceiver {
 	// Functions:
 	void tryToReceivePacket();
 	static void* receiverThreadFunction(void *arg); // Thread function
-	virtual bool isValidPacket(const char* packetBuffer) {}; // This functions is implemented in a derived class, and must return true if the packet received is valid, and false otherwise
-	virtual void actionWhenReceived(const char* packetBuffer) {}; // This function is implemented in a derived class, and decides what to do when a packet has been received.
+	virtual bool isValidPacket(const char* packetBuffer) = 0; // This functions is implemented in a derived class, and must return true if the packet received is valid, and false otherwise
+	virtual void actionWhenReceived(const char* packetBuffer) = 0; // This function is implemented in a derived class, and decides what to do when a packet has been received.
 
 protected:
 	// Const and dest protected so base class cannot be instantiated or deleted
 	UDPReceiver(const int UDPport, const int packetSize); // Port that packets should be received on, and the size (constant) of the packets that should be received
 	~UDPReceiver();
+	void startReceiverThread();
 };
 
 #endif /* UDPRECEIVER_H_ */
