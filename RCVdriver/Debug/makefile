@@ -10,7 +10,6 @@ RM := rm -rf
 -include sources.mk
 -include subdir.mk
 -include src/subdir.mk
--include src/PositionEstimation/subdir.mk
 -include src/LidarProcessing/subdir.mk
 
 OS_SUFFIX := $(subst Linux,linux,$(subst Darwin/x86_64,darwin,$(shell uname -s)/$(shell uname -m)))
@@ -60,7 +59,7 @@ all: RCVdriver
 RCVdriver: $(OBJS) $(USER_OBJS)
 	@echo 'Building target: $@'
 	@echo 'Invoking: NVCC Linker'
-	/usr/local/cuda-7.5/bin/nvcc --cudart static --relocatable-device-code=false -gencode arch=compute_30,code=compute_30 -gencode arch=compute_30,code=sm_30 -link -o  "RCVdriver" $(OBJS) $(USER_OBJS) $(LIBS)
+	/usr/local/cuda-7.5/bin/nvcc --cudart static --relocatable-device-code=false -gencode arch=compute_52,code=sm_52 -link -o  "RCVdriver" $(OBJS) $(USER_OBJS) $(LIBS)
 	@echo 'Finished building target: $@'
 	@echo ' '
 

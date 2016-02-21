@@ -8,7 +8,7 @@
 #include <arpa/inet.h>
 
 class UDPReceiver {
-	const int packetSize;
+	const int updPort, packetSize;
 	char* packetBuffer;
 	bool stopReceiverThread; // Flag for exiting the thread
 	pthread_t receiverThreadID;

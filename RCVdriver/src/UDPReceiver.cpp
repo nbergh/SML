@@ -6,7 +6,10 @@
 #include <string.h> // for memset
 #include <unistd.h> // for close
 
-UDPReceiver::UDPReceiver(const int UDPport, int packetSize) : packetSize(packetSize), packetBuffer(new char[packetSize]), stopReceiverThread(false), receiverThreadID(0) {
+UDPReceiver::UDPReceiver(int udpPortA, int packetSize) : updPort(udpPortA), packetSize(packetSize) {
+	packetBuffer = new char[packetSize];
+	stopReceiverThread = false;
+	receiverThreadID = 0;
 
 	udpSocketID = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 	if (udpSocketID==-1) {
@@ -18,7 +21,7 @@ UDPReceiver::UDPReceiver(const int UDPport, int packetSize) : packetSize(packetS
 	socketLength = sizeof(socketAddressMe);
 	memset((char *) &socketAddressMe, 0, sizeof(socketAddressMe)); // Zero out socketAddressMe
 	socketAddressMe.sin_family = AF_INET;
-	socketAddressMe.sin_port = htons(UDPport);
+	socketAddressMe.sin_port = htons(updPort);
 	socketAddressMe.sin_addr.s_addr = htonl(INADDR_ANY);
 
 	// Bind the socket to socketAddress
@@ -26,10 +29,6 @@ UDPReceiver::UDPReceiver(const int UDPport, int packetSize) : packetSize(packetS
 		printf("%s%s\n","Unable to bind socket to socketAddress: ", strerror(errno));
 		exit(-1);
 	}
-
-	// Test to see if UDP data can be received:
-	printf("%s%d%s\n","Trying to receive UDP data on port ", UDPport, "...");
-	tryToReceivePacket();
 }
 
 UDPReceiver::~UDPReceiver() {
@@ -39,6 +38,20 @@ UDPReceiver::~UDPReceiver() {
 	close(udpSocketID);
 
 	delete[] packetBuffer;
+}
+
+void UDPReceiver::startReceiverThread() {
+	// Test to see if UDP data can be received:
+	printf("%s%d%s","Trying to receive UDP data on port ", updPort, "... ");
+	fflush(stdout);
+	tryToReceivePacket();
+	printf("%s","success\n");
+
+	//Start the receiver thread
+	if(pthread_create(&receiverThreadID,NULL,receiverThreadFunction,this)) {
+		printf("%s%s\n","Unable to create thread: ", strerror(errno));
+		exit(-1);
+	}
 }
 
 void UDPReceiver::tryToReceivePacket() {
@@ -51,14 +64,6 @@ void UDPReceiver::tryToReceivePacket() {
 			exit(-1);
 		}
 		if (isValidPacket(packetBuffer)) {return;}
-	}
-}
-
-void UDPReceiver::startReceiverThread() {
-	//Start the receiver thread
-	if(pthread_create(&receiverThreadID,NULL,receiverThreadFunction,this)) {
-		printf("%s%s\n","Unable to create thread: ", strerror(errno));
-		exit(-1);
 	}
 }
 

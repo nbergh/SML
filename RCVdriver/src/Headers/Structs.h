@@ -45,9 +45,9 @@ struct PathPointInGPScords {
 	bool isReversingFromPrevNode;
 };
 struct VehiclePosition {
-	// The position and heading of the vehicle
+	// The position and heading of the vehicle. This is the data coming from the trimble and IMU
 	GPSposition currentPosition;
-	double currentHeading;
+	float currentHeading, groundSpeed;
 };
 struct VehicleStatus {
 	/* A struct with information that the program uses to inform on what is going on in runtime

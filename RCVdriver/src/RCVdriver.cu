@@ -9,7 +9,7 @@
  */
 
 #include "LidarProcessing/Headers/LidarProcessing.h"
-#include "PositionEstimation/Headers/PositionEstimation.h"
+#include "Headers/PositionEstimation.h"
 #include "Headers/PathPlanning.h"
 #include "Headers/Graphics.h"
 #include "Headers/Input.h"
@@ -27,6 +27,8 @@ int main(void)
 	// Initialize the main objects:
 	LidarProcessing lidarProcessing;
 	PositionEstimation positionEstimation;
+
+	sleep(10000);
 	PathPlanning pathPlanning(lidarProcessing.getLidarExportData(),positionEstimation.getCurrentVehiclePosition(),vehicleStatus);
 //	Graphics graphics(lidarProcessing.getLidarExportData(),pathPlanning.getPathExportData());
 	Input input(vehicleStatus,pathPlanning);
