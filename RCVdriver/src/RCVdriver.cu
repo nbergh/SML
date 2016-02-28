@@ -8,7 +8,7 @@
  ============================================================================
  */
 
-#include "LidarProcessing/Headers/LidarProcessing.h"
+#include "Headers/LidarProcessing.h"
 #include "Headers/PositionEstimation.h"
 #include "Headers/PathPlanning.h"
 #include "Headers/Graphics.h"
@@ -24,31 +24,33 @@ int main(void)
 	//Temp:ex
 	VehicleStatus vehicleStatus = {0};
 
+	sleep(0.3);
 	// Initialize the main objects:
 	LidarProcessing lidarProcessing;
-	PositionEstimation positionEstimation;
+	lidarProcessing.processLidarData();
 
-	sleep(10000);
-	PathPlanning pathPlanning(lidarProcessing.getLidarExportData(),positionEstimation.getCurrentVehiclePosition(),vehicleStatus);
+
+	PositionEstimation positionEstimation;
+//	PathPlanning pathPlanning(lidarProcessing.getLidarExportData(),positionEstimation.getCurrentVehiclePosition(),vehicleStatus);
 //	Graphics graphics(lidarProcessing.getLidarExportData(),pathPlanning.getPathExportData());
-	Input input(vehicleStatus,pathPlanning);
+//	Input input(vehicleStatus,pathPlanning);
 
 	timeval startTime,endTime;
 	int iterationTime=0;
 	// Start the main controller thread:
-	while (!input.getExitProgramBool()) {
+	while (/*!input.getExitProgramBool()*/true) {
 		gettimeofday(&startTime,NULL);
 
 		lidarProcessing.processLidarData(); // Process the lidar data from the sensors
 		positionEstimation.updatePosition(); // Update the position (VehiclePosition)
-		pathPlanning.updatePathAndControlSignals(); // Update the path and send control signals
+//		pathPlanning.updatePathAndControlSignals(); // Update the path and send control signals
 
 		gettimeofday(&endTime,NULL);
 		iterationTime = (endTime.tv_sec*1000000 + endTime.tv_usec) - (startTime.tv_sec*1000000 + startTime.tv_usec);
-		iterationTime = (iterationTime>(1000000.0/CONTROLLER_UPDATE_RATE) ? (1000000.0/CONTROLLER_UPDATE_RATE) : iterationTime);
+		iterationTime = (iterationTime>(1000000.0/PARAMETERS::CONTROLLER_UPDATE_RATE) ? (1000000.0/PARAMETERS::CONTROLLER_UPDATE_RATE) : iterationTime);
 
 //		printf("%s%d\n","itertime: ",iterationTime);
-		sleep((1.0/CONTROLLER_UPDATE_RATE)-(iterationTime/1000000.0)); // Run at specified frequency
+		sleep((1.0/PARAMETERS::CONTROLLER_UPDATE_RATE)-(iterationTime/1000000.0)); // Run at specified frequency
 //		sleep(100);
 	}
 

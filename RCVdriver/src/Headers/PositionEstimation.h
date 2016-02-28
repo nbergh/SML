@@ -4,7 +4,7 @@
 #include "Structs.h"
 #include "UDPReceiver.h"
 
-#define GPS_UDP_PORT 50000
+#define GPS_UDP_PORT 50005
 
 class PositionEstimation {
 	class GPSUDPReceiver : public UDPReceiver {
@@ -33,6 +33,7 @@ class PositionEstimation {
 	GPSUDPReceiver gpsUDPReceiver;
 	VehiclePosition vehiclePosition = {};
 
+	inline double convertCoordinatesToDecimalDegrees(double coordinate);
 public:
 	PositionEstimation() {}
 	~PositionEstimation() {}

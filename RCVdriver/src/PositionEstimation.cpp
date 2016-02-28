@@ -62,19 +62,24 @@ void PositionEstimation::GPSUDPReceiver::actionWhenReceived(const char* packetBu
 	}
 }
 
+double PositionEstimation::convertCoordinatesToDecimalDegrees(double coordinate) {
+	// This function converts coordinates in form 59° 21.0548' to 59.35091, e.g. converts minutes to decimal degrees
+	coordinate/=100;
+	int degrees = (int) coordinate;
+
+	return degrees + (coordinate-degrees)*(100.0/60.0);
+}
+
 void PositionEstimation::updatePosition() {
 	// This function fuses the trimble and IMU
 
 	// currentHeading in vehiclePosition must always be the angle in radians from true NORTH to the current vehicle
 	// longitudinal centerline. CurrentHeading must always be between -Pi and Pi
 
-	vehiclePosition.currentHeading = gpsUDPReceiver.rawTrimbleData.trackAngle;
-	vehiclePosition.groundSpeed = gpsUDPReceiver.rawTrimbleData.groundSpeed;
-	vehiclePosition.currentPosition.latc = gpsUDPReceiver.rawTrimbleData.latC;
-	vehiclePosition.currentPosition.longc = gpsUDPReceiver.rawTrimbleData.longC;
-
-
-
+	vehiclePosition.currentHeading = (gpsUDPReceiver.rawTrimbleData.trackAngle-180)*2*M_PI/360.0;
+	vehiclePosition.groundSpeed = gpsUDPReceiver.rawTrimbleData.groundSpeed * 0.51444;
+	vehiclePosition.currentPosition.latc = convertCoordinatesToDecimalDegrees(gpsUDPReceiver.rawTrimbleData.latC);
+	vehiclePosition.currentPosition.longc = convertCoordinatesToDecimalDegrees(gpsUDPReceiver.rawTrimbleData.longC);
 }
 
 

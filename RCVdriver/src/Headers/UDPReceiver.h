@@ -26,7 +26,7 @@ class UDPReceiver {
 
 protected:
 	// Const and dest protected so base class cannot be instantiated or deleted
-	UDPReceiver(const int UDPport, const int packetSize); // Port that packets should be received on, and the size (constant) of the packets that should be received
+	UDPReceiver(const int udpPort, const int packetSize); // Port that packets should be received on, and the size (constant) of the packets that should be received
 	~UDPReceiver();
 	void startReceiverThread();
 };

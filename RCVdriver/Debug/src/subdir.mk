@@ -10,19 +10,19 @@ CPP_SRCS += \
 ../src/UDPReceiver.cpp 
 
 CU_SRCS += \
-../src/CudaErrorCheckFunctions.cu \
+../src/LidarProcessing.cu \
 ../src/PathPlanning.cu \
 ../src/RCVdriver.cu 
 
 CU_DEPS += \
-./src/CudaErrorCheckFunctions.d \
+./src/LidarProcessing.d \
 ./src/PathPlanning.d \
 ./src/RCVdriver.d 
 
 OBJS += \
-./src/CudaErrorCheckFunctions.o \
 ./src/Graphics.o \
 ./src/Input.o \
+./src/LidarProcessing.o \
 ./src/PathPlanning.o \
 ./src/PositionEstimation.o \
 ./src/RCVdriver.o \
@@ -36,19 +36,19 @@ CPP_DEPS += \
 
 
 # Each subdirectory must supply rules for building sources it contributes
-src/%.o: ../src/%.cu
-	@echo 'Building file: $<'
-	@echo 'Invoking: NVCC Compiler'
-	/usr/local/cuda-7.5/bin/nvcc -G -g -O0 -std=c++11 -gencode arch=compute_52,code=sm_52  -odir "src" -M -o "$(@:%.o=%.d)" "$<"
-	/usr/local/cuda-7.5/bin/nvcc -G -g -O0 -std=c++11 --compile --relocatable-device-code=false -gencode arch=compute_52,code=sm_52  -x cu -o  "$@" "$<"
-	@echo 'Finished building: $<'
-	@echo ' '
-
 src/%.o: ../src/%.cpp
 	@echo 'Building file: $<'
 	@echo 'Invoking: NVCC Compiler'
 	/usr/local/cuda-7.5/bin/nvcc -G -g -O0 -std=c++11 -gencode arch=compute_52,code=sm_52  -odir "src" -M -o "$(@:%.o=%.d)" "$<"
 	/usr/local/cuda-7.5/bin/nvcc -G -g -O0 -std=c++11 --compile  -x c++ -o  "$@" "$<"
+	@echo 'Finished building: $<'
+	@echo ' '
+
+src/%.o: ../src/%.cu
+	@echo 'Building file: $<'
+	@echo 'Invoking: NVCC Compiler'
+	/usr/local/cuda-7.5/bin/nvcc -G -g -O0 -std=c++11 -gencode arch=compute_52,code=sm_52  -odir "src" -M -o "$(@:%.o=%.d)" "$<"
+	/usr/local/cuda-7.5/bin/nvcc -G -g -O0 -std=c++11 --compile --relocatable-device-code=false -gencode arch=compute_52,code=sm_52  -x cu -o  "$@" "$<"
 	@echo 'Finished building: $<'
 	@echo ' '
 

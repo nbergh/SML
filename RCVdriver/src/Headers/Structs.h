@@ -4,11 +4,11 @@
 // This header contains definitions for structs that are used in RCVdriver
 
 // Used by opengGL:
-struct LidarDataPoint {
+struct LidarPointForGraphics {
 	// This struct represents an openGL vertex with 3 coordinates
 	float x,y,z;
 };
-struct ObstaclePoint {
+struct ObstaclePointForGraphics {
 	float x,y;
 };
 struct PathPointInLocalXY {
@@ -16,9 +16,9 @@ struct PathPointInLocalXY {
 	unsigned char r,g,b; // Colors of the point
 };
 struct LidarExportData {
-	LidarDataPoint* lidarDataPoints;
-	ObstaclePoint* obstacleSquares,* obstacleSquaresOnGPU;
-	int currentNrOfObstacles;
+	LidarPointForGraphics* lidarPointsListForGraphics;
+	ObstaclePointForGraphics* obstaclePointListForGraphics;
+	int currentNrOfObstaclesForGraphics;
 };
 struct PathExportData {
 	PathExportData(int& lengthOfMacroPath,int& currentIndexInMacroPath,int& lengthOfMicroPath,int& currentIndexInMicroPath, PathPointInLocalXY*& macroPathXY, PathPointInLocalXY*& microPathXY) :

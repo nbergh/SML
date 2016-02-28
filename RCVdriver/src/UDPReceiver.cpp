@@ -6,7 +6,7 @@
 #include <string.h> // for memset
 #include <unistd.h> // for close
 
-UDPReceiver::UDPReceiver(int udpPortA, int packetSize) : updPort(udpPortA), packetSize(packetSize) {
+UDPReceiver::UDPReceiver(int udpPort, int packetSize) : updPort(udpPort), packetSize(packetSize) {
 	packetBuffer = new char[packetSize];
 	stopReceiverThread = false;
 	receiverThreadID = 0;
