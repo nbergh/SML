@@ -4,7 +4,7 @@
 #include "Structs.h"
 #include "UDPReceiver.h"
 
-#define LIDAR_UDP_PORT 50000
+#define LIDAR_UDP_PORT 2368
 
 class LidarProcessing {
 	class LidarUDPReceiver : public UDPReceiver {

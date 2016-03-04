@@ -231,10 +231,10 @@ namespace { // Limit scope to translation unit
 		 * in meters can be expressed as a matrix row or column index. After that they will simply be rounded to an integer.
 		 */
 		int myMatrixXcoord,myMatrixYcoord,myMatrixPointerOffset;
-		myMatrixXcoord = (myPointX + PARAMETERS::NR_OCCUPANCY_GRID_CELLS_Y_WISE*PARAMETERS::OCCUPANCY_GRID_CELL_SIZE/2.0)/PARAMETERS::OCCUPANCY_GRID_CELL_SIZE; // Integer division
-		myMatrixYcoord = (myPointY + PARAMETERS::NR_OCCUPANCY_GRID_CELLS_X_WISE*PARAMETERS::OCCUPANCY_GRID_CELL_SIZE/2.0)/PARAMETERS::OCCUPANCY_GRID_CELL_SIZE;
+		myMatrixXcoord = myPointX/PARAMETERS::OCCUPANCY_GRID_CELL_SIZE - PARAMETERS::NR_OCCUPANCY_GRID_CELLS_X_WISE/2.0; // Integer division
+		myMatrixYcoord = myPointY/PARAMETERS::OCCUPANCY_GRID_CELL_SIZE - PARAMETERS::NR_OCCUPANCY_GRID_CELLS_Y_WISE/2.0;
 
-		if (myMatrixXcoord >= 0 && myMatrixYcoord >= 0 && myMatrixXcoord < PARAMETERS::NR_OCCUPANCY_GRID_CELLS_X_WISE && myMatrixXcoord < PARAMETERS::NR_OCCUPANCY_GRID_CELLS_Y_WISE) {
+		if (myMatrixXcoord >= 0 && myMatrixYcoord >= 0 && myMatrixXcoord < PARAMETERS::NR_OCCUPANCY_GRID_CELLS_X_WISE && myMatrixYcoord < PARAMETERS::NR_OCCUPANCY_GRID_CELLS_Y_WISE) {
 			myMatrixPointerOffset = myMatrixXcoord * PARAMETERS::NR_OCCUPANCY_GRID_CELLS_Y_WISE + myMatrixYcoord;
 
 			// Write to matrices. Remember that max field for a matrix may be negative, and min field for a matrix may be positive:
@@ -249,7 +249,7 @@ namespace { // Limit scope to translation unit
 		int myThreadID = blockIdx.x*blockDim.x+threadIdx.x,myMatrixXcoord,myMatrixYcoord,myObstacleIndex;
 		float obstacleX,obstacleY;
 
-		myMatrixXcoord = myThreadID/PARAMETERS::NR_OCCUPANCY_GRID_CELLS_X_WISE;
+		myMatrixXcoord = myThreadID/PARAMETERS::NR_OCCUPANCY_GRID_CELLS_Y_WISE;
 		myMatrixYcoord = myThreadID - myMatrixXcoord*PARAMETERS::NR_OCCUPANCY_GRID_CELLS_Y_WISE;
 		obstacleX = myMatrixXcoord*PARAMETERS::OCCUPANCY_GRID_CELL_SIZE - PARAMETERS::OCCUPANCY_GRID_CELL_SIZE*PARAMETERS::NR_OCCUPANCY_GRID_CELLS_X_WISE/2.0;
 		obstacleY = myMatrixYcoord*PARAMETERS::OCCUPANCY_GRID_CELL_SIZE - PARAMETERS::OCCUPANCY_GRID_CELL_SIZE*PARAMETERS::NR_OCCUPANCY_GRID_CELLS_Y_WISE/2.0;

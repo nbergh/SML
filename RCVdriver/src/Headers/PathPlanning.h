@@ -31,6 +31,9 @@ class PathPlanning {
 		int heapArrayIndex;
 		aStarNode* previousNodeInPath;
 	};
+	struct xyCoordinate {
+		float x,y;
+	};
 	class HashTable {
 		struct HashBucket {
 			HashBucket(float x, float y) : node(x,y) {nextBucket=NULL;}
@@ -80,6 +83,9 @@ class PathPlanning {
 	PathPointInLocalXY* microPathXY; // The same path as microPathGPS, but in x,y coordinates
 	PathPointInLocalXY* macroPathXY; // The same path as macroPathGPS, but in x,y coordinates
 	int lengthOfMacroPath,lengthOfMicroPath,currentIndexInMacroPath,currentIndexInMicroPath; // The attributes of the paths
+
+	xyCoordinate* vehicleCollisionCheckingPointsOnGPU; // The points in the vehicle that should be checked for collisions
+	int nrOfVehicleCollisionCheckingPoints;
 
 	// Functions
 	bool updatePathIndexes();
