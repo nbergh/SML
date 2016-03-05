@@ -19,6 +19,7 @@ struct LidarExportData {
 	LidarPointForGraphics* lidarPointsListForGraphics;
 	ObstaclePointForGraphics* obstaclePointListForGraphics;
 	int currentNrOfObstaclesForGraphics;
+	char* occupancyGridOnGPU;
 };
 struct PathExportData {
 	PathExportData(int& lengthOfMacroPath,int& currentIndexInMacroPath,int& lengthOfMicroPath,int& currentIndexInMicroPath, PathPointInLocalXY*& macroPathXY, PathPointInLocalXY*& microPathXY) :
@@ -40,8 +41,7 @@ struct PathPointInGPScords {
 	 * (radian degrees from true north) from the previous point in the path
 	 */
 	GPSposition position;
-	float latDistanceFromPrevPathPoint,longDistanceFromPrevPathPoint; // The distance in meters from prevPathPoint to this point, lat and long
-	double courseFromPreviousPathPoint;
+	float latDistanceFromPrevPathPoint,longDistanceFromPrevPathPoint,courseFromPreviousPathPoint; // The distance in meters from prevPathPoint to this point, lat and long
 	bool isReversingFromPrevNode;
 };
 struct VehiclePosition {

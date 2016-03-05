@@ -8,6 +8,20 @@
 #define NR_OF_GRID_HEADINGS 20 //
 
 class PathPlanning {
+public:
+	struct vehicleCollisionCheckCoordinate {
+		float x,y;
+	};
+
+	PathPlanning(const LidarExportData& lidarExportData, const VehiclePosition& vehiclePosition, VehicleStatus& vehicleStatus);
+	~PathPlanning();
+
+	void updatePathAndControlSignals();
+	void setLoadNewMacroPathFlag() {loadNewMacroPathFlag=true;}
+	void setMacroPathFilePath(char* macroPathFilePath) {this->macroPathFilePath=macroPathFilePath;}
+	const PathExportData& getPathExportData() {return pathExportData;}
+
+private:
 	struct aStarNode {
 		/* Everything is initialized to zero on struct initialization
 		 * x and y are later set by HashTable::addAstarNode()
@@ -30,9 +44,6 @@ class PathPlanning {
 		bool isOnOpenSet, isOnClosedSet, vehicleIsReversingFromPrevNode;
 		int heapArrayIndex;
 		aStarNode* previousNodeInPath;
-	};
-	struct xyCoordinate {
-		float x,y;
 	};
 	class HashTable {
 		struct HashBucket {
@@ -84,7 +95,7 @@ class PathPlanning {
 	PathPointInLocalXY* macroPathXY; // The same path as macroPathGPS, but in x,y coordinates
 	int lengthOfMacroPath,lengthOfMicroPath,currentIndexInMacroPath,currentIndexInMicroPath; // The attributes of the paths
 
-	xyCoordinate* vehicleCollisionCheckingPointsOnGPU; // The points in the vehicle that should be checked for collisions
+	vehicleCollisionCheckCoordinate* vehicleCollisionCheckingPointsOnGPU; // The points in the vehicle that should be checked for collisions
 	int nrOfVehicleCollisionCheckingPoints;
 
 	// Functions
@@ -96,17 +107,8 @@ class PathPlanning {
 	void loadNewMacroPath();
 	bool checkIfaStarNodeIsTooCloseToObstacles(const aStarNode& node, const double vehicleLocalHeadingAtNode) const;
 	double getTargetHeadingForMicroPath();
+	void initializeCollisionCheckingPoints();
 	void clearAllPaths(bool includeMacroPath);
-
-	public:
-		PathPlanning(const LidarExportData& lidarExportData, const VehiclePosition& vehiclePosition, VehicleStatus& vehicleStatus);
-		~PathPlanning();
-
-		void updatePathAndControlSignals();
-		void setLoadNewMacroPathFlag() {loadNewMacroPathFlag=true;}
-		void setMacroPathFilePath(char* macroPathFilePath) {this->macroPathFilePath=macroPathFilePath;}
-		const PathExportData& getPathExportData() {return pathExportData;}
-
 };
 
 #endif /* PATHPLANNING_H_ */

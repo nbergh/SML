@@ -15,10 +15,9 @@
 namespace {
 	// Non-member function declarations
 	__device__ bool nodeIsCollidingOnGPU; // Flag used by the GPU to indicate if an aStar or pathnode is within collision distance to an obstacle
-	__global__ void checkVehiclePositionForCollisions(float vehiclePosX, float vehiclePosY, float localVehicleHeadingAtNode, const char* occupancyGridOnGPU, const xyCoordinate* vehicleCollisionCheckingPointsOnGPU, int nrOfVehicleCollisionCheckingPoints);
 	__global__ void translatePathToXY(PathPointInGPScords* pathGPSOnGPU, PathPointInLocalXY* pathXYonGPU, int lengthOfPath, VehiclePosition vehiclePosition);
-	__global__ void checkIfaStarNodeIsTooCloseToObstaclesKernel(float nodeX, float nodeY, double localVehicleHeadingAtNode, const ObstaclePoint* obstacleSquaresOnGPU, int nrOfObstacles);
-	__global__ void checkPathForCollisions(PathPointInGPScords* pathGPSOnGPU, PathPointInLocalXY* pathXYonGPU, int lengthOfPath, const char* occupancyGridOnGPU, const xyCoordinate* vehicleCollisionCheckingPointsOnGPU, int nrOfVehicleCollisionCheckingPoints, VehiclePosition vehiclePosition);
+	__global__ void checkPathForCollisions(PathPointInGPScords* pathGPSOnGPU, PathPointInLocalXY* pathXYonGPU, int lengthOfPath, const char* occupancyGridOnGPU, const PathPlanning::vehicleCollisionCheckCoordinate* vehicleCollisionCheckingPointsOnGPU, int nrOfVehicleCollisionCheckingPoints);
+	__global__ void checkIfNodeIsColliding(float nodeX, float nodeY, float localVehicleHeadingAtNode, const char* occupancyGridOnGPU, const PathPlanning::vehicleCollisionCheckCoordinate* vehicleCollisionCheckingPointsOnGPU, int nrOfVehicleCollisionCheckingPoints);
 	float rotateAndGetX(float x, float y, double angle);
 	float rotateAndGetY(float x, float y, double angle);
 	float getLatDistanceBetweenGPSpositions(GPSposition fromPosition, GPSposition toPosition);
@@ -43,31 +42,7 @@ PathPlanning::PathPlanning(const LidarExportData& lidarExportData,const VehicleP
 	macroPathFilePath=NULL;
 	loadNewMacroPathFlag=false;
 
-	// Initialize the collision checking points:
-	int index=0;
-	int nrPointsWidhtWise = round(PARAMETERS::RCV_WIDTH / (2*PARAMETERS::OCCUPANCY_GRID_CELL_SIZE));
-	int nrPointsLengthWise = round(PARAMETERS::RCV_LENGTH / (2*PARAMETERS::OCCUPANCY_GRID_CELL_SIZE));
-
-	nrOfVehicleCollisionCheckingPoints = nrPointsWidhtWise * nrPointsLengthWise;
-	xyCoordinate* vehicleCollisionCheckingPoints = new xyCoordinate[nrOfVehicleCollisionCheckingPoints];
-
-	float currentX,currentY;
-	currentX = 1.5*PARAMETERS::OCCUPANCY_GRID_CELL_SIZE - PARAMETERS::RCV_WIDTH/2.0;
-	for (int i=0;i<nrPointsWidhtWise;i++) {
-		currentY = 1.5*PARAMETERS::OCCUPANCY_GRID_CELL_SIZE - PARAMETERS::RCV_LENGTH/2.0;
-		for (int j=0;j<nrPointsLengthWise;j++) {
-			vehicleCollisionCheckingPoints[index].x = currentX;
-			vehicleCollisionCheckingPoints[index].y = currentY;
-			index++;
-			currentY+=2*PARAMETERS::OCCUPANCY_GRID_CELL_SIZE;
-		}
-		currentX+=2*PARAMETERS::OCCUPANCY_GRID_CELL_SIZE;
-	}
-
-	CUDA_ERROR_CHECK_FUNCTIONS::CUDA_CHECK_RETURN(cudaMalloc((void**)&vehicleCollisionCheckingPointsOnGPU,nrOfVehicleCollisionCheckingPoints*sizeof(xyCoordinate)));
-	CUDA_ERROR_CHECK_FUNCTIONS::CUDA_CHECK_RETURN(cudaMemcpy(vehicleCollisionCheckingPointsOnGPU, vehicleCollisionCheckingPoints, nrOfVehicleCollisionCheckingPoints*sizeof(xyCoordinate), cudaMemcpyHostToDevice));
-
-	delete[] vehicleCollisionCheckingPoints;
+	initializeCollisionCheckingPoints();
 }
 
 PathPlanning::~PathPlanning() {
@@ -234,11 +209,9 @@ bool PathPlanning::translateMicroPathToXYandCheckIfMicroPathIsTooCloseToObstacle
 	int numberOfKernelBlocks = lengthOfMicroPathOnGPU/32+1;
 	translatePathToXY<<<numberOfKernelBlocks,32>>>(microPathGPSOnGPU,microPathXYOnGPU,lengthOfMicroPathOnGPU,vehiclePosition);
 
-	/* Do collision check on microPathXY, but don't check collisions on the first node, since it is behind the vehicle
-	 * and already has been passed
-	 */
-	numberOfKernelBlocks = (lengthOfMicroPathOnGPU-1)*lidarExportData.currentNrOfObstacles/256+1;
-	checkPathForCollisions<<<numberOfKernelBlocks,256>>>(microPathGPSOnGPU+1,microPathXYOnGPU+1,lengthOfMicroPathOnGPU-1,lidarExportData.obstacleSquaresOnGPU,lidarExportData.currentNrOfObstacles,vehiclePosition);
+	// Do collision check on microPathXY
+	numberOfKernelBlocks = lengthOfMicroPathOnGPU*nrOfVehicleCollisionCheckingPoints/256+1;
+	checkPathForCollisions<<<numberOfKernelBlocks,256>>>(microPathGPSOnGPU, microPathXYOnGPU, lengthOfMicroPathOnGPU, lidarExportData.occupancyGridOnGPU, vehicleCollisionCheckingPointsOnGPU, nrOfVehicleCollisionCheckingPoints);
 
 	CUDA_ERROR_CHECK_FUNCTIONS::CUDA_CHECK_RETURN(cudaMemcpyFromSymbol(&nodeIsColliding,nodeIsCollidingOnGPU,sizeof(bool),0,cudaMemcpyDeviceToHost));
 	CUDA_ERROR_CHECK_FUNCTIONS::CUDA_CHECK_RETURN(cudaMemcpy(microPathXY+(currentIndexInMicroPath-1),microPathXYOnGPU,lengthOfMicroPathOnGPU*sizeof(PathPointInLocalXY),cudaMemcpyDeviceToHost));
@@ -284,7 +257,7 @@ void PathPlanning::loadNewMacroPath() {
 			clearAllPaths(true);
 			return;
 		}
-		sscanf(line,"%lf %lf\n",&((macroPathGPS+i)->position.latc),&((macroPathGPS+i)->position.longc));
+		sscanf(line,"%lf %lf\n",&macroPathGPS[i].position.latc,&macroPathGPS[i].position.longc);
 		macroPathGPS[i].courseFromPreviousPathPoint = getCourseBetweenGPSpositions(macroPathGPS[i-1].position,macroPathGPS[i].position);
 		macroPathGPS[i].latDistanceFromPrevPathPoint = getLatDistanceBetweenGPSpositions(macroPathGPS[i-1].position,macroPathGPS[i].position);
 		macroPathGPS[i].longDistanceFromPrevPathPoint = getLongDistanceBetweenGPSpositions(macroPathGPS[i-1].position,macroPathGPS[i].position);
@@ -303,13 +276,41 @@ void PathPlanning::loadNewMacroPath() {
 	printf("%s\n","Path successfully loaded");
 }
 
-double PathPlanning::getTargetHeadingForMicroPath() {
-	if (currentIndexInMacroPath==lengthOfMacroPath-1) {return macroPathGPS[currentIndexInMacroPath].courseFromPreviousPathPoint;} // TODO, change to local heading
-	return macroPathGPS[currentIndexInMacroPath+1].courseFromPreviousPathPoint;
+void PathPlanning::initializeCollisionCheckingPoints() {
+	// Initialize the collision checking points:
+	int index=0;
+	int nrPointsWidhtWise = round(PARAMETERS::RCV_WIDTH / (2*PARAMETERS::OCCUPANCY_GRID_CELL_SIZE));
+	int nrPointsLengthWise = round(PARAMETERS::RCV_LENGTH / (2*PARAMETERS::OCCUPANCY_GRID_CELL_SIZE));
+
+	nrOfVehicleCollisionCheckingPoints = nrPointsWidhtWise * nrPointsLengthWise;
+	vehicleCollisionCheckCoordinate* vehicleCollisionCheckingPoints = new vehicleCollisionCheckCoordinate[nrOfVehicleCollisionCheckingPoints];
+
+	float currentX,currentY;
+	currentX = 1.5*PARAMETERS::OCCUPANCY_GRID_CELL_SIZE - PARAMETERS::RCV_WIDTH/2.0;
+	for (int i=0;i<nrPointsWidhtWise;i++) {
+		currentY = 1.5*PARAMETERS::OCCUPANCY_GRID_CELL_SIZE - PARAMETERS::RCV_LENGTH/2.0;
+		for (int j=0;j<nrPointsLengthWise;j++) {
+			vehicleCollisionCheckingPoints[index].x = currentX;
+			vehicleCollisionCheckingPoints[index].y = currentY;
+			index++;
+			currentY+=2*PARAMETERS::OCCUPANCY_GRID_CELL_SIZE;
+		}
+		currentX+=2*PARAMETERS::OCCUPANCY_GRID_CELL_SIZE;
+	}
+
+	CUDA_ERROR_CHECK_FUNCTIONS::CUDA_CHECK_RETURN(cudaMalloc((void**)&vehicleCollisionCheckingPointsOnGPU,nrOfVehicleCollisionCheckingPoints*sizeof(vehicleCollisionCheckCoordinate)));
+	CUDA_ERROR_CHECK_FUNCTIONS::CUDA_CHECK_RETURN(cudaMemcpy(vehicleCollisionCheckingPointsOnGPU, vehicleCollisionCheckingPoints, nrOfVehicleCollisionCheckingPoints*sizeof(vehicleCollisionCheckCoordinate), cudaMemcpyHostToDevice));
+
+	delete[] vehicleCollisionCheckingPoints;
 }
 
-//temp:
-int iter;
+double PathPlanning::getTargetHeadingForMicroPath() {
+//	if (currentIndexInMacroPath==lengthOfMacroPath-1) {return macroPathGPS[currentIndexInMacroPath].courseFromPreviousPathPoint;} // TODO, change to local heading
+//	return macroPathGPS[currentIndexInMacroPath+1].courseFromPreviousPathPoint;
+	return 0; // TODO
+}
+
+int iter; // TODO
 bool PathPlanning::generateMicroPath(const float targetX, const float targetY, const double targetHeading) {
 	/* This function generates a path from {0,0} to targetX,targetY using a variant of A* tailored for producing vehicle paths
 	 * returns true if a path was found, and false otherwise
@@ -396,7 +397,7 @@ bool PathPlanning::generateMicroPath(const float targetX, const float targetY, c
 		 */
 		microPathGPS[i].position.latc = vehiclePosition.currentPosition.latc + rotateAndGetY(currentNode->x,currentNode->y,vehiclePosition.currentHeading) * (1.0/LENGTH_OF_ONE_LAT_DEGREE_IN_METERS);
 		microPathGPS[i].position.longc = vehiclePosition.currentPosition.longc + rotateAndGetX(currentNode->x,currentNode->y,vehiclePosition.currentHeading) * (1.0/LENGTH_OF_ONE_LONG_DEGREE_IN_METERS);
-		microPathGPS[i].courseFromPreviousPathPoint = atan2(currentNode->x-currentNode->previousNodeInPath->x,currentNode->y-currentNode->previousNodeInPath->y) + vehiclePosition.currentHeading;
+		microPathGPS[i].courseFromPreviousPathPoint = atan2f(currentNode->x-currentNode->previousNodeInPath->x,currentNode->y-currentNode->previousNodeInPath->y) + vehiclePosition.currentHeading;
 		microPathGPS[i].latDistanceFromPrevPathPoint = rotateAndGetY(currentNode->x-currentNode->previousNodeInPath->x,currentNode->y-currentNode->previousNodeInPath->y,vehiclePosition.currentHeading);
 		microPathGPS[i].longDistanceFromPrevPathPoint = rotateAndGetX(currentNode->x-currentNode->previousNodeInPath->x,currentNode->y-currentNode->previousNodeInPath->y,vehiclePosition.currentHeading);
 		microPathGPS[i].isReversingFromPrevNode = currentNode->vehicleIsReversingFromPrevNode;
@@ -504,13 +505,13 @@ void PathPlanning::discoverNeighbor(aStarNode& baseNode, const float targetX, co
 bool PathPlanning::checkIfaStarNodeIsTooCloseToObstacles(const aStarNode& node, const double localVehicleHeadingAtNode) const {
 	// This function checks if node is too close to any obstacle defined in obstacleSquaresOnGPU, and returns true if so
 	bool nodeIsColliding=false;
-	int numberOfKernelBlocks = lidarExportData.currentNrOfObstacles/32+1;
+	int numberOfKernelBlocks = nrOfVehicleCollisionCheckingPoints/32+1;
 
-	CUDA_CHECK_RETURN(cudaMemcpyToSymbol(nodeIsCollidingOnGPU,&nodeIsColliding,sizeof(bool),0,cudaMemcpyHostToDevice));
+	CUDA_ERROR_CHECK_FUNCTIONS::CUDA_CHECK_RETURN(cudaMemcpyToSymbol(nodeIsCollidingOnGPU,&nodeIsColliding,sizeof(bool),0,cudaMemcpyHostToDevice));
 
-	checkIfaStarNodeIsTooCloseToObstaclesKernel<<<numberOfKernelBlocks,32>>>(node.x,node.y,localVehicleHeadingAtNode,lidarExportData.obstacleSquaresOnGPU,lidarExportData.currentNrOfObstacles);
+	checkIfNodeIsColliding<<<numberOfKernelBlocks,32>>>(node.x,node.y,localVehicleHeadingAtNode,lidarExportData.occupancyGridOnGPU,vehicleCollisionCheckingPointsOnGPU,nrOfVehicleCollisionCheckingPoints);
 
-	CUDA_CHECK_RETURN(cudaMemcpyFromSymbol(&nodeIsColliding,nodeIsCollidingOnGPU,sizeof(bool),0,cudaMemcpyDeviceToHost));
+	CUDA_ERROR_CHECK_FUNCTIONS::CUDA_CHECK_RETURN(cudaMemcpyFromSymbol(&nodeIsColliding,nodeIsCollidingOnGPU,sizeof(bool),0,cudaMemcpyDeviceToHost));
 	return nodeIsColliding;
 }
 
@@ -685,68 +686,24 @@ PathPlanning::aStarNode* PathPlanning::MinHeap::popNode() {
 
 namespace {
 // Non member and cuda functions implementations:
-	__global__ void checkVehiclePositionForCollisions(float vehiclePosX, float vehiclePosY, float localVehicleHeadingAtNode, const char* occupancyGridOnGPU, const xyCoordinate* vehicleCollisionCheckingPointsOnGPU, int nrOfVehicleCollisionCheckingPoints) {
-		// This function checks
-		int myThreadID = blockIdx.x*blockDim.x+threadIdx.x;
+	__device__ bool checkOccupancyGridForCollision(float nodeX, float nodeY, float localVehicleHeadingAtNode, PathPlanning::vehicleCollisionCheckCoordinate vehicleCoordinate, const char* occupancyGridOnGPU) {
+		float myX = vehicleCoordinate.x;
+		float myY = vehicleCoordinate.y;
+		float myTranslatedX = myX * cosf(localVehicleHeadingAtNode) - myY * sinf(localVehicleHeadingAtNode);
+		float myTranslatedY = myX * sinf(localVehicleHeadingAtNode) + myY * cosf(localVehicleHeadingAtNode);
+		myTranslatedX += nodeX;
+		myTranslatedY += nodeY;
 
-		if (myThreadID < nrOfVehicleCollisionCheckingPoints) {
-			float myX = vehicleCollisionCheckingPointsOnGPU[myThreadID].x;
-			float myY = vehicleCollisionCheckingPointsOnGPU[myThreadID].y;
-			float myTranslatedX = myX * cosf(localVehicleHeadingAtNode) - myY * sinf(localVehicleHeadingAtNode);
-			float myTranslatedY = myX * sinf(localVehicleHeadingAtNode) + myY * cosf(localVehicleHeadingAtNode);
-			myTranslatedX += vehiclePosX;
-			myTranslatedY += vehiclePosY;
+		int myMatrixXcoord = myTranslatedX/PARAMETERS::OCCUPANCY_GRID_CELL_SIZE - PARAMETERS::NR_OCCUPANCY_GRID_CELLS_X_WISE/2.0; // Integer division
+		int myMatrixYcoord = myTranslatedY/PARAMETERS::OCCUPANCY_GRID_CELL_SIZE - PARAMETERS::NR_OCCUPANCY_GRID_CELLS_Y_WISE/2.0;
 
-			myMatrixXcoord = myTranslatedX/PARAMETERS::OCCUPANCY_GRID_CELL_SIZE - PARAMETERS::NR_OCCUPANCY_GRID_CELLS_X_WISE/2.0; // Integer division
-			myMatrixYcoord = myTranslatedY/PARAMETERS::OCCUPANCY_GRID_CELL_SIZE - PARAMETERS::NR_OCCUPANCY_GRID_CELLS_Y_WISE/2.0;
-
-			if (myMatrixXcoord >= 0 && myMatrixYcoord >= 0
-				&& myMatrixXcoord < PARAMETERS::NR_OCCUPANCY_GRID_CELLS_X_WISE && myMatrixYcoord < PARAMETERS::NR_OCCUPANCY_GRID_CELLS_Y_WISE
-				&& occupancyGridOnGPU[myMatrixXcoord * PARAMETERS::NR_OCCUPANCY_GRID_CELLS_Y_WISE + myMatrixYcoord]>0) {
-				// This cell is occupied by an obstacle
-				nodeIsCollidingOnGPU=true;
-			}
-		}
-	}
-
-	__device__ bool checkIfPathPointIsTooCloseToObstacle(float pathPointX, float pathPointY, double localVehicleHeadingAtNode,float obstacleX, float obstacleY) {
-		// This function returns true if the obstacle is to close to the vehicle, otherwise returns false
-		float rotatedObstacleX,rotatedObstacleY,minDistanceToObstacle;
-		//TODO explanation of how this function works
-
-		/* Observe that because that the x and y positions of the nodes and obstacles are aligned with the
-		 * ground grid, they have an error margin of +/- PARAMETERS::OCCUPANCY_GRID_CELL_SIZE. Therefore OBSTACLE_SAFETY_DISTANCE
-		 * should never be less than PARAMETERS::OCCUPANCY_GRID_CELL_SIZE
-		 */
-		rotatedObstacleX = abs((obstacleX - pathPointX) * cos(localVehicleHeadingAtNode) - (obstacleY - pathPointY) * sin(localVehicleHeadingAtNode));
-		rotatedObstacleY = abs((obstacleX - pathPointX) * sin(localVehicleHeadingAtNode) + (obstacleY - pathPointY) * cos(localVehicleHeadingAtNode));
-
-		if (rotatedObstacleX>RCV_WIDTH/2.0 && rotatedObstacleY>RCV_LENGTH/2.0) {
-			// minDistanceToObstacle is defined by the distance from {RCV_WIDTH/2.0,RCV_LENGHT/2.0} to the obstacle point
-			minDistanceToObstacle = sqrt((rotatedObstacleX-RCV_WIDTH/2.0)*(rotatedObstacleX-RCV_WIDTH/2.0)+(rotatedObstacleY-RCV_HEIGHT/2.0)*(rotatedObstacleY-RCV_HEIGHT/2.0));
-		}
-		else if (rotatedObstacleX > RCV_WIDTH/2.0) {minDistanceToObstacle = rotatedObstacleX - RCV_WIDTH/2.0;}
-		else if (rotatedObstacleY > RCV_LENGTH/2.0) {minDistanceToObstacle = rotatedObstacleY - RCV_LENGTH/2.0;}
-		else {minDistanceToObstacle = -1;} // Obstacle is inside the vehicle
-
-		if (minDistanceToObstacle < OBSTACLE_SAFETY_DISTANCE) {
-//			double lvhan=localVehicleHeadingAtNode;
-//			float ppx = pathPointX,ppy=pathPointY,ox=obstacleX,oy=obstacleY;
+		if (myMatrixXcoord >= 0 && myMatrixYcoord >= 0
+			&& myMatrixXcoord < PARAMETERS::NR_OCCUPANCY_GRID_CELLS_X_WISE && myMatrixYcoord < PARAMETERS::NR_OCCUPANCY_GRID_CELLS_Y_WISE
+			&& occupancyGridOnGPU[myMatrixXcoord * PARAMETERS::NR_OCCUPANCY_GRID_CELLS_Y_WISE + myMatrixYcoord]>0) {
+			// This cell is occupied by an obstacle
 			return true;
 		}
 		return false;
-	}
-
-	__global__ void checkIfaStarNodeIsTooCloseToObstaclesKernel(float nodeX, float nodeY, double localVehicleHeadingAtNode, const ObstaclePoint* obstacleSquaresOnGPU, int nrOfObstacles) {
-		int myThreadID = blockIdx.x*blockDim.x+threadIdx.x;
-		float obstacleX,obstacleY;
-
-		if (myThreadID < nrOfObstacles) {
-			obstacleX = (obstacleSquaresOnGPU + 4*myThreadID)->x +PARAMETERS::OCCUPANCY_GRID_CELL_SIZE/2.0;
-			obstacleY = (obstacleSquaresOnGPU + 4*myThreadID)->y +PARAMETERS::OCCUPANCY_GRID_CELL_SIZE/2.0;
-
-			if(checkIfPathPointIsTooCloseToObstacle(nodeX,nodeY,localVehicleHeadingAtNode,obstacleX,obstacleY)) {nodeIsCollidingOnGPU=true;}
-		}
 	}
 
 	__global__ void translatePathToXY(PathPointInGPScords* pathGPSOnGPU, PathPointInLocalXY* pathXYonGPU, int lengthOfPath, VehiclePosition vehiclePosition) {
@@ -754,36 +711,43 @@ namespace {
 		float scaledX,scaledY,rotatedX,rotatedY;
 
 		if (myThreadID < lengthOfPath) {
-			scaledX = ((pathGPSOnGPU+myThreadID)->position.longc - vehiclePosition.currentPosition.longc) * LENGTH_OF_ONE_LONG_DEGREE_IN_METERS;
-			scaledY = ((pathGPSOnGPU+myThreadID)->position.latc - vehiclePosition.currentPosition.latc) * LENGTH_OF_ONE_LAT_DEGREE_IN_METERS;
+			scaledX = (pathGPSOnGPU[myThreadID].position.longc - vehiclePosition.currentPosition.longc) * LENGTH_OF_ONE_LONG_DEGREE_IN_METERS;
+			scaledY = (pathGPSOnGPU[myThreadID].position.latc - vehiclePosition.currentPosition.latc) * LENGTH_OF_ONE_LAT_DEGREE_IN_METERS;
 			rotatedX = scaledX * cosf(vehiclePosition.currentHeading) - scaledY * sinf(vehiclePosition.currentHeading);
 			rotatedY = scaledX * sinf(vehiclePosition.currentHeading) + scaledY * cosf(vehiclePosition.currentHeading);
-			(pathXYonGPU+myThreadID)->x=rotatedX;
-			(pathXYonGPU+myThreadID)->y=rotatedY;
+			pathXYonGPU[myThreadID].x=rotatedX;
+			pathXYonGPU[myThreadID].y=rotatedY;
 
-			if ((pathGPSOnGPU+myThreadID)->isReversingFromPrevNode) {(pathXYonGPU+myThreadID)->r=255;}
-			else {(pathXYonGPU+myThreadID)->g=255;}
+			if (pathGPSOnGPU[myThreadID].isReversingFromPrevNode) {pathXYonGPU[myThreadID].r=255;}
+			else {pathXYonGPU[myThreadID].g=255;}
 		}
 	}
 
-	__global__ void checkPathForCollisions(PathPointInGPScords* pathGPSOnGPU, PathPointInLocalXY* pathXYonGPU, int lengthOfPath, const char* occupancyGridOnGPU, const xyCoordinate* vehicleCollisionCheckingPointsOnGPU, int nrOfVehicleCollisionCheckingPoints, VehiclePosition vehiclePosition) {
+	__global__ void checkPathForCollisions(PathPointInGPScords* pathGPSOnGPU, PathPointInLocalXY* pathXYonGPU, int lengthOfPath, const char* occupancyGridOnGPU, const PathPlanning::vehicleCollisionCheckCoordinate* vehicleCollisionCheckingPointsOnGPU, int nrOfVehicleCollisionCheckingPoints) {
 		/* Think of the function as a matrix, where nodes are the rows, and obstacles are the columns. For each node/obstacle pair, see if
 		 * their distance is at least the min distance. To get the row and column index, row = index/columnSize, column = index - row*columnSize
 		 */
 		int myThreadID = blockIdx.x*blockDim.x+threadIdx.x, myPathIndex = myThreadID/nrOfVehicleCollisionCheckingPoints, myVehicleCollisionCheckPointIndex = myThreadID-myPathIndex*nrOfVehicleCollisionCheckingPoints;
-		float pathPointX,pathPointY,obstacleX,obstacleY;
-		double localVehicleHeadingAtNode;
+		float pathPointX,pathPointY,localVehicleHeadingAtNode;
 
-		if (myThreadID < lengthOfPath*nrOfVehicleCollisionCheckingPoints) {
+		if (myThreadID < lengthOfPath*nrOfVehicleCollisionCheckingPoints && myPathIndex > 0) { // myPathIndex>0 so the function doesn't collision check microPath[currentMicroPathIndex]. That point is behind the vehicle, and should not be checked
 			// The positions of the nodes and obstacles are the center distances of their respective square
-			pathPointX = (pathXYonGPU+myPathIndex)->x;
-			pathPointY = (pathXYonGPU+myPathIndex)->y;
-			localVehicleHeadingAtNode = (pathGPSOnGPU+myPathIndex)->courseFromPreviousPathPoint - vehiclePosition.currentHeading; //TODO, maybe calculate this with atan2(prevnode,node)
+			pathPointX = pathXYonGPU[myPathIndex].x;
+			pathPointY = pathXYonGPU[myPathIndex].y;
+			localVehicleHeadingAtNode = atan2f(pathPointX-pathXYonGPU[myPathIndex-1].x,pathPointY-pathXYonGPU[myPathIndex-1].y);
 
-			obstacleX = (obstacleSquaresOnGPU + 4*myObstacleIndex)->x + PARAMETERS::OCCUPANCY_GRID_CELL_SIZE/2.0;
-			obstacleY = (obstacleSquaresOnGPU + 4*myObstacleIndex)->y + PARAMETERS::OCCUPANCY_GRID_CELL_SIZE/2.0;
+			if(checkOccupancyGridForCollision(pathPointX,pathPointY,localVehicleHeadingAtNode,vehicleCollisionCheckingPointsOnGPU[myVehicleCollisionCheckPointIndex],occupancyGridOnGPU)) {
+				nodeIsCollidingOnGPU=true;
+			}
+		}
+	}
 
-			if(checkIfPathPointIsTooCloseToObstacle(pathPointX,pathPointY,localVehicleHeadingAtNode,obstacleX,obstacleY)) {nodeIsCollidingOnGPU=true;}
+	__global__ void checkIfNodeIsColliding(float nodeX, float nodeY, float localVehicleHeadingAtNode, const char* occupancyGridOnGPU, const PathPlanning::vehicleCollisionCheckCoordinate* vehicleCollisionCheckingPointsOnGPU, int nrOfVehicleCollisionCheckingPoints) {
+		// This function checks
+		int myThreadID = blockIdx.x*blockDim.x+threadIdx.x;
+
+		if (myThreadID < nrOfVehicleCollisionCheckingPoints && checkOccupancyGridForCollision(nodeX,nodeY,localVehicleHeadingAtNode,vehicleCollisionCheckingPointsOnGPU[myThreadID],occupancyGridOnGPU)) {
+			nodeIsCollidingOnGPU=true;
 		}
 	}
 
@@ -817,3 +781,43 @@ namespace {
 }
 
 
+
+//	__device__ bool checkIfPathPointIsTooCloseToObstacle(float pathPointX, float pathPointY, double localVehicleHeadingAtNode,float obstacleX, float obstacleY) {
+//		// This function returns true if the obstacle is to close to the vehicle, otherwise returns false
+//		float rotatedObstacleX,rotatedObstacleY,minDistanceToObstacle;
+//		//TODO explanation of how this function works
+//
+//		/* Observe that because that the x and y positions of the nodes and obstacles are aligned with the
+//		 * ground grid, they have an error margin of +/- PARAMETERS::OCCUPANCY_GRID_CELL_SIZE. Therefore OBSTACLE_SAFETY_DISTANCE
+//		 * should never be less than PARAMETERS::OCCUPANCY_GRID_CELL_SIZE
+//		 */
+//		rotatedObstacleX = abs((obstacleX - pathPointX) * cos(localVehicleHeadingAtNode) - (obstacleY - pathPointY) * sin(localVehicleHeadingAtNode));
+//		rotatedObstacleY = abs((obstacleX - pathPointX) * sin(localVehicleHeadingAtNode) + (obstacleY - pathPointY) * cos(localVehicleHeadingAtNode));
+//
+//		if (rotatedObstacleX>RCV_WIDTH/2.0 && rotatedObstacleY>RCV_LENGTH/2.0) {
+//			// minDistanceToObstacle is defined by the distance from {RCV_WIDTH/2.0,RCV_LENGHT/2.0} to the obstacle point
+//			minDistanceToObstacle = sqrt((rotatedObstacleX-RCV_WIDTH/2.0)*(rotatedObstacleX-RCV_WIDTH/2.0)+(rotatedObstacleY-RCV_HEIGHT/2.0)*(rotatedObstacleY-RCV_HEIGHT/2.0));
+//		}
+//		else if (rotatedObstacleX > RCV_WIDTH/2.0) {minDistanceToObstacle = rotatedObstacleX - RCV_WIDTH/2.0;}
+//		else if (rotatedObstacleY > RCV_LENGTH/2.0) {minDistanceToObstacle = rotatedObstacleY - RCV_LENGTH/2.0;}
+//		else {minDistanceToObstacle = -1;} // Obstacle is inside the vehicle
+//
+//		if (minDistanceToObstacle < OBSTACLE_SAFETY_DISTANCE) {
+////			double lvhan=localVehicleHeadingAtNode;
+////			float ppx = pathPointX,ppy=pathPointY,ox=obstacleX,oy=obstacleY;
+//			return true;
+//		}
+//		return false;
+//	}
+
+//	__global__ void checkIfaStarNodeIsTooCloseToObstaclesKernel(float nodeX, float nodeY, double localVehicleHeadingAtNode, const ObstaclePoint* obstacleSquaresOnGPU, int nrOfObstacles) {
+//		int myThreadID = blockIdx.x*blockDim.x+threadIdx.x;
+//		float obstacleX,obstacleY;
+//
+//		if (myThreadID < nrOfObstacles) {
+//			obstacleX = (obstacleSquaresOnGPU + 4*myThreadID)->x +PARAMETERS::OCCUPANCY_GRID_CELL_SIZE/2.0;
+//			obstacleY = (obstacleSquaresOnGPU + 4*myThreadID)->y +PARAMETERS::OCCUPANCY_GRID_CELL_SIZE/2.0;
+//
+//			if(checkIfPathPointIsTooCloseToObstacle(nodeX,nodeY,localVehicleHeadingAtNode,obstacleX,obstacleY)) {nodeIsCollidingOnGPU=true;}
+//		}
+//	}

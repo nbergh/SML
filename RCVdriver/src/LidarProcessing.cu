@@ -30,6 +30,7 @@ LidarProcessing::LidarProcessing() {
 
 	lidarExportData.lidarPointsListForGraphics = lidarPointsListForGraphics;
 	lidarExportData.obstaclePointListForGraphics = obstaclePointListForGraphics;
+	lidarExportData.occupancyGridOnGPU = occupancyGridOnGPU;
 	// lidarExportData.currentNrOfObstaclesForGraphics is initalized to zero
 
 	// Then initialize the UDP socket, test the connection, and start the UDP receiver thread:
