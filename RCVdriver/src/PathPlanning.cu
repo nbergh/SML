@@ -327,13 +327,11 @@ bool PathPlanning::generateMicroPath(const float targetX, const float targetY, c
 	gettimeofday(&startTime,NULL);
 
 	aStarNode* baseNode = &hashTable.addAstarNode(0,-1,0,0,false),* goalNode;
-	iter=0;
+
 
 	while (true) {
 		baseNode->isOnClosedSet=true;
 		baseNode->isOnOpenSet=false;
-
-		iter++;
 
 		// Check if baseNode is close enough to the target:
 		baseNodeDistanceToTarget = sqrt((baseNode->x-targetX)*(baseNode->x-targetX)+(baseNode->y-targetY)*(baseNode->y-targetY));
@@ -689,8 +687,8 @@ namespace {
 	__device__ bool checkOccupancyGridForCollision(float nodeX, float nodeY, float localVehicleHeadingAtNode, PathPlanning::vehicleCollisionCheckCoordinate vehicleCoordinate, const char* occupancyGridOnGPU) {
 		float myX = vehicleCoordinate.x;
 		float myY = vehicleCoordinate.y;
-		float myTranslatedX = myX * cosf(localVehicleHeadingAtNode) - myY * sinf(localVehicleHeadingAtNode);
-		float myTranslatedY = myX * sinf(localVehicleHeadingAtNode) + myY * cosf(localVehicleHeadingAtNode);
+		float myTranslatedX = myX * cosf(localVehicleHeadingAtNode) + myY * sinf(localVehicleHeadingAtNode);
+		float myTranslatedY = -myX * sinf(localVehicleHeadingAtNode) + myY * cosf(localVehicleHeadingAtNode);
 		myTranslatedX += nodeX;
 		myTranslatedY += nodeY;
 

@@ -4,8 +4,7 @@
 #include <stdio.h>
 
 namespace CUDA_ERROR_CHECK_FUNCTIONS {
-	void CheckCudaErrorAux (const char *file, unsigned line, const char *statement, cudaError_t err)
-	{
+	void CheckCudaErrorAux (const char *file, unsigned line, const char *statement, cudaError_t err) {
 		if (err == cudaSuccess)
 			return;
 		printf("%s%s%s%s%d%s%s%s%d\n",statement," returned ",cudaGetErrorString(err),"(",err,") at",file,":",line);
