@@ -2,7 +2,7 @@
 #include <assert.h>
 #include <vector>
 
-#define DEBUG 0
+#define DEBUG 1
 
 PathPlanner::PathPlanner(float occupancyGridCellSize):
 	occupancyGridCellSize(occupancyGridCellSize) {
@@ -93,7 +93,7 @@ void PathPlanner::planNewPath(unsigned char** costMap, int costMapNrOfCellsXwise
 			// Goal reached
 			break;
 		}
-		if (iters==2000) {break;}
+//		if (iters==2000) {break;}
 
 		for (int i=0;i<8;i++) {discoverNeighbor(*baseNode,i,localGoalX,localGoalY);}
 
@@ -165,7 +165,7 @@ void PathPlanner::planNewPath(unsigned char** costMap, int costMapNrOfCellsXwise
 
 void PathPlanner::discoverNeighbor(aStarNode& baseNode, int index, float goalX, float goalY) {
 	aStarNode* neighborNode;
-	float distanceFromStartNode,pathCostFromStartNode,costForNeighborNode,distanceToGoal,neighborHeuristic;
+	float distanceBaseToNeighbor,distanceStartToNeighbor,costBaseToNeighbor,costStartToNeighbor,distanceNeighborToGoal,neighborHeuristic;
 	float deltaX,deltaY;
 	switch (index) {
 		case 0 : deltaX=-1;deltaY=-1; break;
@@ -187,19 +187,23 @@ void PathPlanner::discoverNeighbor(aStarNode& baseNode, int index, float goalX, 
 	neighborNode->x = baseNode.x+deltaX;
 	neighborNode->y = baseNode.y+deltaY;
 
-	if (neighborNode->isOnClosedSet || (costForNeighborNode=getCostForNode(neighborNode,robotHeading))==-1) {return;} // Collision detected, so return
+	if (neighborNode->isOnClosedSet || (costBaseToNeighbor=getCostForNode(neighborNode,robotHeading))==-1) {return;} // Collision detected, so return
 
-	distanceFromStartNode = baseNode.distanceFromStartNode + sqrtf((baseNode.x-neighborNode->x)*(baseNode.x-neighborNode->x)+(baseNode.y-neighborNode->y)*(baseNode.y-neighborNode->y));
-	pathCostFromStartNode = baseNode.pathCostFromStartNode + costForNeighborNode;
-	distanceToGoal = sqrtf((neighborNode->x-goalX)*(neighborNode->x-goalX)+(neighborNode->y-goalY)*(neighborNode->y-goalY));
-	neighborHeuristic = distanceFromStartNode + distanceToGoal /*+ 0.01*pathCostFromStartNode*/;
+	distanceBaseToNeighbor = sqrtf((baseNode.x-neighborNode->x)*(baseNode.x-neighborNode->x)+(baseNode.y-neighborNode->y)*(baseNode.y-neighborNode->y));
+	costBaseToNeighbor*=distanceBaseToNeighbor;
+
+	distanceStartToNeighbor = baseNode.distanceFromStartNode + distanceBaseToNeighbor;
+	costStartToNeighbor = baseNode.pathCostFromStartNode + costBaseToNeighbor;
+	distanceNeighborToGoal = sqrtf((neighborNode->x-goalX)*(neighborNode->x-goalX)+(neighborNode->y-goalY)*(neighborNode->y-goalY));
+
+	neighborHeuristic = /*distanceStartToNeighbor*/ costStartToNeighbor/100.0 + distanceNeighborToGoal;
 
 	if (!neighborNode->isOnOpenSet) {
 		// Node has not been discovered yet
 		neighborNode->isOnOpenSet=true;
 
-		neighborNode->distanceFromStartNode = distanceFromStartNode;
-		neighborNode->pathCostFromStartNode = pathCostFromStartNode;
+		neighborNode->distanceFromStartNode = distanceStartToNeighbor;
+		neighborNode->pathCostFromStartNode = costStartToNeighbor;
 		neighborNode->heuristic = neighborHeuristic;
 		neighborNode->prevNodeInPath = &baseNode;
 
@@ -209,11 +213,11 @@ void PathPlanner::discoverNeighbor(aStarNode& baseNode, int index, float goalX, 
 		if(DEBUG) {debugPrintExpansion(baseNode,*neighborNode);}
 
 	}
-	else if (distanceFromStartNode < neighborNode->distanceFromStartNode) {
+	else if (costStartToNeighbor < neighborNode->pathCostFromStartNode) {
 		if(DEBUG) {debugPrintDeleteExpansion(*neighborNode->prevNodeInPath,*neighborNode);}
 
-		neighborNode->distanceFromStartNode = distanceFromStartNode;
-		neighborNode->pathCostFromStartNode = pathCostFromStartNode;
+		neighborNode->distanceFromStartNode = distanceStartToNeighbor;
+		neighborNode->pathCostFromStartNode = costStartToNeighbor;
 		neighborNode->heuristic = neighborHeuristic;
 		neighborNode->prevNodeInPath = &baseNode;
 
@@ -286,7 +290,7 @@ void PathPlanner::debugPrintDeleteExpansion(const aStarNode& baseNode,const aSta
 		float fromX,toX,fromY,toY;
 	};
 
-	assert(baseNode.prevNodeInPath!=0);
+	assert(neighborNode.prevNodeInPath!=0);
 
 	debugSearchOut.close();
 	std::ifstream debugSearchIn("/home/sml-linux/Matlab/cvap_astar_out.m");
@@ -337,14 +341,14 @@ void PathPlanner::debugPrintPath() {
 }
 
 void PathPlanner::debugTestHeap() {
-	bool isHealtyh=true;
+//	bool isHealtyh=true;
 	float lowestH=-1;
 	aStarNode* currentNode;
 	currentNode = minHeap.popNode();
 
 	while (currentNode!=0) {
 		if (!(lowestH==-1 || (currentNode->heuristic >= lowestH))) {
-			isHealtyh=false;
+//			isHealtyh=false;
 		}
 		lowestH=currentNode->heuristic;
 		currentNode=minHeap.popNode();
