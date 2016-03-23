@@ -277,25 +277,29 @@ void PathPlanning::loadNewMacroPath() {
 }
 
 void PathPlanning::initializeCollisionCheckingPoints() {
-	// Initialize the collision checking points:
+	// Initialize the collision checking points. Each obstacle in the map is expanded so that it makes up a 3*3 cell square.
+	// Therefore, represent the robot as a number of points with less than 3* PARAMETERS::OCCUPANCY_GRID_CELL_SIZE meters between them
+	float halfStep = 1.49*	PARAMETERS::OCCUPANCY_GRID_CELL_SIZE; // Half of the distance that separates each collision checking point. 1.49 (instead of 1.5) is used because of rounding errors
+	int nrPointsWidhtWise = (PARAMETERS::RCV_WIDTH-2*halfStep) / (2*halfStep) + 2;
+	int nrPointsLengthWise = (PARAMETERS::RCV_LENGTH-2*halfStep) / (2*halfStep) + 2;
 	int index=0;
-	int nrPointsWidhtWise = round(PARAMETERS::RCV_WIDTH / (2*PARAMETERS::OCCUPANCY_GRID_CELL_SIZE));
-	int nrPointsLengthWise = round(PARAMETERS::RCV_LENGTH / (2*PARAMETERS::OCCUPANCY_GRID_CELL_SIZE));
 
 	nrOfVehicleCollisionCheckingPoints = nrPointsWidhtWise * nrPointsLengthWise;
 	vehicleCollisionCheckCoordinate* vehicleCollisionCheckingPoints = new vehicleCollisionCheckCoordinate[nrOfVehicleCollisionCheckingPoints];
 
 	float currentX,currentY;
-	currentX = 1.5*PARAMETERS::OCCUPANCY_GRID_CELL_SIZE - PARAMETERS::RCV_WIDTH/2.0;
+	currentX = halfStep - PARAMETERS::RCV_WIDTH/2.0;
 	for (int i=0;i<nrPointsWidhtWise;i++) {
-		currentY = 1.5*PARAMETERS::OCCUPANCY_GRID_CELL_SIZE - PARAMETERS::RCV_LENGTH/2.0;
+		currentY = halfStep - PARAMETERS::RCV_LENGTH/2.0;
 		for (int j=0;j<nrPointsLengthWise;j++) {
 			vehicleCollisionCheckingPoints[index].x = currentX;
 			vehicleCollisionCheckingPoints[index].y = currentY;
 			index++;
-			currentY+=2*PARAMETERS::OCCUPANCY_GRID_CELL_SIZE;
+			currentY+=2*halfStep;
+			if (j==nrPointsLengthWise-2) {currentY = PARAMETERS::RCV_LENGTH/2.0 - halfStep;}
 		}
-		currentX+=2*PARAMETERS::OCCUPANCY_GRID_CELL_SIZE;
+		currentX+=2*halfStep;
+		if (i==nrPointsWidhtWise-2) {currentX = PARAMETERS::RCV_WIDTH/2.0 - halfStep;}
 	}
 
 	CUDA_ERROR_CHECK_FUNCTIONS::CUDA_CHECK_RETURN(cudaMalloc((void**)&vehicleCollisionCheckingPointsOnGPU,nrOfVehicleCollisionCheckingPoints*sizeof(vehicleCollisionCheckCoordinate)));
@@ -310,12 +314,12 @@ double PathPlanning::getTargetHeadingForMicroPath() {
 	return 0; // TODO
 }
 
-int iter; // TODO
 bool PathPlanning::generateMicroPath(const float targetX, const float targetY, const double targetHeading) {
 	/* This function generates a path from {0,0} to targetX,targetY using a variant of A* tailored for producing vehicle paths
 	 * returns true if a path was found, and false otherwise
 	 */
 
+	int iter=0;
 	// First delete the current microGPSpath:
 	clearAllPaths(false);
 	hashTable.clearHashTable();
@@ -354,6 +358,7 @@ bool PathPlanning::generateMicroPath(const float targetX, const float targetY, c
 		}
 
 		for (int i=0;i<10;i++) {discoverNeighbor(*baseNode,targetX,targetY,targetHeading,i);}
+		iter++;
 
 		baseNode = minHeap.popNode();
 

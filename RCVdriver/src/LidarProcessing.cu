@@ -232,8 +232,8 @@ namespace { // Limit scope to translation unit
 		 * in meters can be expressed as a matrix row or column index. After that they will simply be rounded to an integer.
 		 */
 		int myMatrixXcoord,myMatrixYcoord,myMatrixPointerOffset;
-		myMatrixXcoord = myPointX/PARAMETERS::OCCUPANCY_GRID_CELL_SIZE - PARAMETERS::NR_OCCUPANCY_GRID_CELLS_X_WISE/2.0; // Integer division
-		myMatrixYcoord = myPointY/PARAMETERS::OCCUPANCY_GRID_CELL_SIZE - PARAMETERS::NR_OCCUPANCY_GRID_CELLS_Y_WISE/2.0;
+		myMatrixXcoord = myPointX/PARAMETERS::OCCUPANCY_GRID_CELL_SIZE + PARAMETERS::NR_OCCUPANCY_GRID_CELLS_X_WISE/2.0; // Integer division
+		myMatrixYcoord = myPointY/PARAMETERS::OCCUPANCY_GRID_CELL_SIZE + PARAMETERS::NR_OCCUPANCY_GRID_CELLS_Y_WISE/2.0;
 
 		if (myMatrixXcoord >= 0 && myMatrixYcoord >= 0 && myMatrixXcoord < PARAMETERS::NR_OCCUPANCY_GRID_CELLS_X_WISE && myMatrixYcoord < PARAMETERS::NR_OCCUPANCY_GRID_CELLS_Y_WISE) {
 			myMatrixPointerOffset = myMatrixXcoord * PARAMETERS::NR_OCCUPANCY_GRID_CELLS_Y_WISE + myMatrixYcoord;

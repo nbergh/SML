@@ -26,7 +26,7 @@ class PositionEstimation {
 		int tokenizeString(const char* packetBuffer, int startPos, char* token, int tokenMaxLength);
 
 	public:
-		GPSUDPReceiver() : UDPReceiver(GPS_UDP_PORT,200) {startReceiverThread();}
+		GPSUDPReceiver() : UDPReceiver(GPS_UDP_PORT,200) {/*startReceiverThread();*/}
 		~GPSUDPReceiver() {}
 	};
 

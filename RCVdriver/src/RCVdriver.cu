@@ -16,7 +16,6 @@
 #include "Headers/Parameters.h"
 
 #include <unistd.h>
-#include <stdio.h>
 #include <sys/time.h>
 
 int main(void)
@@ -26,12 +25,10 @@ int main(void)
 
 	// Initialize the main objects:
 	LidarProcessing lidarProcessing;
-	sleep(1);
-	lidarProcessing.processLidarData();
 	PositionEstimation positionEstimation;
 	PathPlanning pathPlanning(lidarProcessing.getLidarExportData(),positionEstimation.getCurrentVehiclePosition(),vehicleStatus);
 //	Graphics graphics(lidarProcessing.getLidarExportData(),pathPlanning.getPathExportData());
-//	Input input(vehicleStatus,pathPlanning);
+	Input input(vehicleStatus,pathPlanning);
 
 	timeval startTime,endTime;
 	int iterationTime=0;
@@ -41,7 +38,7 @@ int main(void)
 
 		lidarProcessing.processLidarData(); // Process the lidar data from the sensors
 		positionEstimation.updatePosition(); // Update the position (VehiclePosition)
-//		pathPlanning.updatePathAndControlSignals(); // Update the path and send control signals
+		pathPlanning.updatePathAndControlSignals(); // Update the path and send control signals
 
 		gettimeofday(&endTime,NULL);
 		iterationTime = (endTime.tv_sec*1000000 + endTime.tv_usec) - (startTime.tv_sec*1000000 + startTime.tv_usec);

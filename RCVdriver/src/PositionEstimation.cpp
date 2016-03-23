@@ -80,6 +80,11 @@ void PositionEstimation::updatePosition() {
 	vehiclePosition.groundSpeed = gpsUDPReceiver.rawTrimbleData.groundSpeed * 0.51444;
 	vehiclePosition.currentPosition.latc = convertCoordinatesToDecimalDegrees(gpsUDPReceiver.rawTrimbleData.latC);
 	vehiclePosition.currentPosition.longc = convertCoordinatesToDecimalDegrees(gpsUDPReceiver.rawTrimbleData.longC);
+
+	// Temp:
+	vehiclePosition.currentHeading=0;
+	vehiclePosition.currentPosition.latc = 59.35106;
+	vehiclePosition.currentPosition.longc = 18.06807;
 }
 
 
